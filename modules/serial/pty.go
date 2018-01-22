@@ -11,11 +11,11 @@ import (
 )
 
 type pty struct {
-	channels []modules.Channels
-	ptmx     int
-	slave int
-	portName string
-	state byte
+	queue      *modules.QueuePair
+	ptmx       int
+	slave      int
+	portName   string
+	state      byte
 }
 
 func ioctl(fd uintptr, flag, data uintptr) error {
@@ -72,7 +72,7 @@ func (p *pty) receiveloop() {
 			copy(b, buffer[:n])
 			log.Printf("[DEBUG] Pty: Sending %+v", b)
 
-			p.channels[0].Out <- modules.Message{Id:p.portName, Body:b}
+			p.queue.Write <- modules.Message{Id:p.portName, Body:b}
 		}
 		if n <= 0 {
 			if err != nil {
@@ -96,21 +96,21 @@ func (p *pty) receiveloop() {
 		}
 	}
 	log.Print("[DEBUG] Pty: Terminating Receiving loop")
-	p.channels[0].Ctl <- true
+	p.queue.Ctl <- true
 }
 
 
 func (p *pty) sendloop() {
 	for {
 		select {
-		case r := <-p.channels[0].In:
+		case r := <-p.queue.Read:
 			n, err := syscall.Write(p.ptmx, r.Body)
 			if err != nil {
 				panic(err)
 			}
 			log.Printf("[DEBUG] Pty: Sent %d bytes", n)
 
-		case <-p.channels[0].Ctl:
+		case <-p.queue.Ctl:
 			log.Print("[DEBUG] Pty: Terminating Sending loop")
 			return
 		}
@@ -168,7 +168,7 @@ func (p *pty) ptyOpen() error {
 
 func (p *pty) Close() {
 	log.Print("[DEBUG] Pty: Closing")
-	close(p.channels[0].Ctl)
+	close(p.queue.Ctl)
 	syscall.Close(p.slave)
 	syscall.Close(p.ptmx)
 
@@ -181,17 +181,29 @@ func (p *pty) GetType() int {
 func (p *pty) GetName() string {
 	return p.portName
 }
+func (p *pty) CreateQueue() (*modules.QueuePair, error)  {
 
-func (m *pty) AddChannels(channels modules.Channels) ([]modules.Channels, error)  {
-	if len(m.channels) > 0 {
-		return nil, fmt.Errorf("Module supports only on pair of channels")
+	if p.queue != nil {
+		return nil, fmt.Errorf("Module supports only one queue")
 	}
-	m.channels = append(m.channels, channels)
-	return m.channels, nil
+	p.queue = &modules.QueuePair{
+		Read:  make(chan modules.Message),
+		Write: make(chan modules.Message),
+		Ctl:   make(chan bool),
+
+	}
+	return p.queue, nil
 }
 
+func (p *pty) ConnectQueuePair(q *modules.QueuePair) error  {
+	return fmt.Errorf("Not supported")
+}
 
-// Reads from a pair of channels
+func (p *pty) GetQueues() []*modules.QueuePair {
+	return []*modules.QueuePair{p.queue}
+}
+
+// Reads from a pair of downstream
 // and write to a serial Port
 // TODO provide the notion of command with a separator
 func (p *pty) Open()  error {
@@ -209,7 +221,5 @@ func (p *pty) Open()  error {
 
 func NewPty() modules.Module {
 
-	return &pty {
-		channels: make([]modules.Channels,0),
-	}
+	return &pty {}
 }

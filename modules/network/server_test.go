@@ -2,18 +2,14 @@ package network
 
 import (
 	"testing"
-	"github.com/jc-m/rhub/modules"
 )
 
 func TestTcpServer(t *testing.T) {
-	in := make(chan modules.Message)
-	out := make(chan modules.Message)
-
 
 	srv := NewTCPServ(":7275")
 
 
-	srv.AddChannels(modules.Channels{In:in, Out:out})
+	q, _ := srv.CreateQueue()
 
 	if err:= srv.Open(); err != nil {
 		t.Fatalf("Cannot open server %s", err)
@@ -22,7 +18,7 @@ func TestTcpServer(t *testing.T) {
 	// Read master.
 	for {
 		select {
-		case x := <-out:
+		case x := <-q.Write:
 			t.Log(x)
 		}
 	}

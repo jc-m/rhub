@@ -10,7 +10,6 @@ import (
 
 
 
-
 type SerialConfig struct {
 	Port string
 	Baud uint
@@ -20,10 +19,10 @@ type SerialConfig struct {
 }
 
 type serialPort struct {
-	config SerialConfig
-	channels []modules.Channels
-	state byte
-	port io.ReadWriteCloser
+	config     SerialConfig
+	queue      *modules.QueuePair
+	state      byte
+	port       io.ReadWriteCloser
 }
 
 func (m *serialPort) serialOpen() error {
@@ -72,12 +71,12 @@ func (m *serialPort) serialWrite(buff []byte) int {
 func (m *serialPort) sendloop() {
 	for {
 		select {
-		case r := <-m.channels[0].In:
+		case r := <-m.queue.Read:
 			if m.state == STATE_CLOSED {
 				return
 			}
 			m.serialWrite(r.Body)
-		case <-m.channels[0].Ctl:
+		case <-m.queue.Ctl:
 			log.Print("[DEBUG] SerialClient: Terminating Sending loop")
 			return
 		}
@@ -97,7 +96,7 @@ func (m *serialPort) receiveloop() {
 			copy(b, buffer[:n])
 			log.Printf("[DEBUG] SerialClient: Sending %+v", b)
 
-			m.channels[0].Out <- modules.Message{Id:m.config.Port, Body:b}
+			m.queue.Write <- modules.Message{Id:m.config.Port, Body:b}
 		}
 
 		if err != nil {
@@ -117,7 +116,7 @@ func (m *serialPort) receiveloop() {
 		}
 	}
 	log.Print("[DEBUG] SerialClient: Terminating Receiving loop")
-	m.channels[0].Ctl <- true
+	m.queue.Ctl <- true
 }
 
 func (m *serialPort) GetName() string {
@@ -132,18 +131,17 @@ func (m *serialPort) GetType() int {
 func (m *serialPort) Close() {
 	log.Print("[DEBUG] SerialClient: Closing")
 	m.state = STATE_CLOSED
-	close(m.channels[0].Ctl)
+	close(m.queue.Ctl)
 	m.port.Close()
 
 }
 
-// Reads from a pair of channels
+// Reads from a pair of downstream
 // and write to a serial Port
 // TODO provide the notion of command with a separator
 func (m *serialPort) Open()  error {
-
-	if len(m.channels) == 0 {
-		return fmt.Errorf("Need to provide one pair of channels")
+	if m.queue == nil {
+		return fmt.Errorf("Need to create Add queue first")
 	}
 	if err := m.serialOpen(); err != nil {
 		log.Printf("[ERROR] SerialClient: Cannot open port: %s", err)
@@ -155,18 +153,32 @@ func (m *serialPort) Open()  error {
 
 	return nil
 }
-func (m *serialPort) AddChannels(channels modules.Channels) ([]modules.Channels, error)  {
-	if len(m.channels) > 0 {
-		return nil, fmt.Errorf("Module supports only on pair of channels")
+
+func (m *serialPort) CreateQueue() (*modules.QueuePair, error)  {
+
+	if m.queue != nil {
+		return nil, fmt.Errorf("Module supports only one queue")
 	}
-	m.channels = append(m.channels, channels)
-	return m.channels, nil
+	m.queue = &modules.QueuePair{
+		Read:  make(chan modules.Message),
+		Write: make(chan modules.Message),
+		Ctl:   make(chan bool),
+
+	}
+	return m.queue, nil
+}
+
+func (m *serialPort) ConnectQueuePair(q *modules.QueuePair) error  {
+	return fmt.Errorf("Not supported")
+}
+
+func (m *serialPort) GetQueues() []*modules.QueuePair {
+	return []*modules.QueuePair{m.queue}
 }
 
 func NewSerial(c SerialConfig) modules.Module {
 	return &serialPort{
-		config: c,
-		channels: make([]modules.Channels,0),
-		state: STATE_CLOSED,
+		config:     c,
+		state:      STATE_CLOSED,
 	}
 }

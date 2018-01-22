@@ -15,15 +15,15 @@ func TestSerial(t *testing.T) {
 			DataBits:8,
 			StopBits:2,
 		}
-		channels := modules.Channels{
-			In : make(chan modules.Message),
-			Out : make(chan modules.Message),
+		channels := modules.QueuePair{
+			Read : make(chan modules.Message),
+			Write : make(chan modules.Message),
 			Ctl :  make(chan bool),
 		}
 
 
 		client := NewSerial(c)
-		client.AddChannels(channels)
+		client.AddDownstream(channels)
 
 		err := client.Open()
 		if err != nil {
@@ -31,11 +31,11 @@ func TestSerial(t *testing.T) {
 		}
 		var buffer bytes.Buffer
 		buffer.Write([]byte("Test"))
-		channels.In <- modules.Message{ Id:"test", Body:buffer.Bytes()}
+		channels.Read <- modules.Message{ Id:"test", Body:buffer.Bytes()}
 
 		for {
 			select {
-			case r := <-channels.Out:
+			case r := <-channels.Write:
 				fmt.Printf("XX %s\n", string(r.Body))
 			case <- channels.Ctl: // TODO this gets executed twice if the port is closed
 				fmt.Print("Got an exit")

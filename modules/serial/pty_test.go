@@ -2,24 +2,22 @@ package serial
 
 import (
 	"testing"
-	"github.com/jc-m/rhub/modules"
 )
 
 func TestPTY(t *testing.T) {
-	in := make(chan modules.Message)
-	out := make(chan modules.Message)
-
 
 	pty := NewPty()
-
-	pty.AddChannels(modules.Channels{In:in, Out:out})
+	q, err := pty.CreateQueue()
+	if err != nil {
+		t.Fatalf("Unexpected number of queue")
+	}
 
 	if err:= pty.Open(); err != nil {
 		t.Fatalf("Cannot open port %s", err)
 	}
 
 	// Read master.
-	x := <- out
+	x := <- q.Read
 	t.Log( x)
 
 }

@@ -8,8 +8,7 @@ import (
 )
 
 type tcpServ struct {
-	channels []modules.Channels
-	control chan bool
+	queue   *modules.QueuePair
 	address string
 	listener net.Listener
 	state byte
@@ -36,13 +35,13 @@ func (c *connection) receiveloop(){
 
 			log.Printf("[DEBUG] TCPServer: Sending %+v", b)
 			// needs to have the client address instead
-			c.server.channels[0].Out <- modules.Message{Id:c.server.address, Body:b}
+			c.server.queue.Write <- modules.Message{Id:c.conn.RemoteAddr().String(), Body:b}
 		}
 	}
 	log.Print("[DEBUG] TCPServer: Closing receiveloop")
 
 	c.conn.Close()
-	c.server.channels[0].Ctl <- true
+	c.server.queue.Ctl <- true
 }
 
 func (c *connection) sendloop() {
@@ -50,7 +49,7 @@ func (c *connection) sendloop() {
 
 	for {
 		select {
-		case r := <-c.server.channels[0].In:
+		case r := <-c.server.queue.Read:
 			if r.Id == c.server.address {
 				n, err := c.conn.Write(r.Body)
 				if err != nil {
@@ -58,13 +57,15 @@ func (c *connection) sendloop() {
 				}
 				log.Printf("[DEBUG] TCPServer: Sent %d bytes", n)
 			}
-		case <-c.server.channels[0].Ctl:
+		case <-c.server.queue.Ctl:
 			log.Print("[DEBUG] TCPServer: Terminating Sending loop")
 			return
 		}
 	}
 }
-
+func (t *tcpServ) GetType() int {
+	return modules.DRIVER
+}
 
 func (t *tcpServ) GetName() string {
 	return t.address
@@ -72,9 +73,6 @@ func (t *tcpServ) GetName() string {
 
 func (t *tcpServ) Close() {
 
-}
-func (t *tcpServ) GetControlChan() chan bool {
-	return t.control
 }
 
 func (t *tcpServ) Open()  error {
@@ -104,19 +102,32 @@ func (t *tcpServ) Open()  error {
 	return nil
 }
 
-func (t *tcpServ) AddChannels(channels modules.Channels) ([]modules.Channels, error) {
-	if len(t.channels) > 0 {
-		return nil, fmt.Errorf("Module supports only on pair of channels")
+func (t *tcpServ) CreateQueue() (*modules.QueuePair, error)  {
+	if t.queue != nil {
+		return nil, fmt.Errorf("Module supports only one queue")
 	}
-	t.channels = append(t.channels, channels)
-	return t.channels, nil
+	t.queue = &modules.QueuePair{
+		Read:  make(chan modules.Message),
+		Write: make(chan modules.Message),
+		Ctl:   make(chan bool),
+
+	}
+	return t.queue, nil
 }
+
+func (t *tcpServ) ConnectQueuePair(q *modules.QueuePair) error  {
+	return fmt.Errorf("Not supported")
+}
+
+func (t *tcpServ) GetQueues() []*modules.QueuePair {
+	return []*modules.QueuePair{t.queue}
+}
+
 
 // c is a string in the form of what Go Net package accept for dial
 func NewTCPServ(address string) modules.Module {
 
 	return &tcpServ {
-		channels: make([]modules.Channels,0),
 		address : address,
 	}
 }

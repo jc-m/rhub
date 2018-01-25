@@ -6,13 +6,14 @@ import "github.com/jc-m/rhub/modules"
 /*
 
     +--------------------------------+
-    |             Radio              |
+    |       Generic Radio            |
     +--------------------------------+
        |            |          |
-    CMDBuffer   CMDBuffer   Serial
-       |            |
-      PTY        TCPServer
-
+    CMDBuffer    FT991A      FT991A
+       |            |          |
+      PTY       CMDBuffer    Serial
+                    |
+                TCPServer
 
     Nil             <- PTY        -> CMDBuffer
     Nil             <- TCPServer  -> CMDBuffer

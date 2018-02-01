@@ -22,3 +22,39 @@ func TestMDRsp(t *testing.T) {
 	fmt.Printf("%+v", x)
 
 }
+
+func TestRMRsp(t *testing.T) {
+	x, err := RMRsp("6023")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("%+v", x)
+
+}
+
+func TestPCRsp(t *testing.T) {
+	x, err := PCRsp("005")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("%+v", x)
+
+}
+
+func TestNLRsp(t *testing.T) {
+	x, err := NLRsp("0010")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("%+v", x)
+
+}
+
+func TestRLRsp(t *testing.T) {
+	x, err := RLRsp("006")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("%+v", x)
+
+}

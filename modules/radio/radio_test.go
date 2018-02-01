@@ -29,8 +29,14 @@ func TestRadio(t *testing.T) {
 	var v rigs.RigCommand
 	if err := enc.Decode(&v); err != nil {
 		t.Fatalf("Failed to decode %s", err)
+	}
+	if v, ok := v.Params["VFOA"]; ok {
+		if v != "7070000" {
+			t.Fatalf("Unexpected value %s", v)
+
+		}
 	} else {
-		t.Logf("%+v", v)
+		t.Fatalf("Missing value %s", "VFOA")
 	}
 
 }

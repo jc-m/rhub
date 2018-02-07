@@ -1,5 +1,10 @@
 package serial
 
+/*
+	Reads from the Read queue and sends to PTY port
+    Reads from a pty port and write to Write Queue.
+ */
+
 import (
 	"syscall"
 	"log"
@@ -8,14 +13,20 @@ import (
 	"io"
 	"github.com/jc-m/rhub/modules"
 	"fmt"
+	"github.com/hashicorp/go-uuid"
 )
 
 type pty struct {
 	queue      *modules.QueuePair
+	portPair
+	state      byte
+	uuid       string
+}
+
+type portPair struct {
 	ptmx       int
 	slave      int
 	portName   string
-	state      byte
 }
 
 func ioctl(fd uintptr, flag, data uintptr) error {
@@ -59,6 +70,55 @@ func ptsname(f int) (string, error) {
 	return "", errors.New("TIOCPTYGNAME string not NUL-terminated")
 }
 
+func newpt() (*portPair, error) {
+
+	master, err := syscall.Open("/dev/ptmx", syscall.O_RDWR|syscall.O_NOCTTY|syscall.O_CLOEXEC, 0620)
+	if err != nil {
+		log.Printf("[ERROR] Pty: Cannot open master %s",err)
+		return nil, err
+	}
+	fd := uintptr(master)
+
+
+	defer func() {
+		if err != nil {
+			_ = syscall.Close(master) // Best effort.
+		}
+	}()
+
+
+	// Grant/unlock slave.
+	if err := grantpt(fd); err != nil {
+		log.Printf("[ERROR] Pty: Cannot grant slave %s",err)
+		panic(err)
+	}
+	if err := unlockpt(fd); err != nil {
+		log.Printf("[ERROR] Pty: Cannot unlock slave %s",err)
+
+		panic(err)
+	}
+
+	sname, err := ptsname(master)
+	if err != nil {
+		log.Printf("[ERROR] Pty: Cannot get slave %s",err)
+		return nil, err
+	}
+
+	log.Printf("[DEBUG] Pty: slave name: %s",sname)
+
+	// Keep the pty open so that the other end can close/open at will without causing an EOF error
+	x, err := syscall.Open(sname, syscall.O_RDWR|syscall.O_NOCTTY, 0620 )
+	if err != nil {
+		log.Printf("[ERROR] Pty: Cannot open slave %s",err)
+		return nil, err
+	}
+
+	return &portPair{
+		ptmx: master,
+		portName: sname,
+		slave:x,
+	}, nil
+}
 
 func (p *pty) receiveloop() {
 	buffer := make([]byte, 1024)
@@ -118,50 +178,11 @@ func (p *pty) sendloop() {
 }
 
 func (p *pty) ptyOpen() error {
-	master, err := syscall.Open("/dev/ptmx", syscall.O_RDWR|syscall.O_NOCTTY|syscall.O_CLOEXEC, 0620)
+	pt, err := newpt()
 	if err != nil {
-		log.Printf("[ERROR] Pty: Cannot open master %s",err)
 		return err
 	}
-	fd := uintptr(master)
-
-
-	defer func() {
-		if err != nil {
-			_ = syscall.Close(master) // Best effort.
-		}
-	}()
-
-
-	// Grant/unlock slave.
-	if err := grantpt(fd); err != nil {
-		log.Printf("[ERROR] Pty: Cannot grant slave %s",err)
-		panic(err)
-	}
-	if err := unlockpt(fd); err != nil {
-		log.Printf("[ERROR] Pty: Cannot unlock slave %s",err)
-
-		panic(err)
-	}
-
-	sname, err := ptsname(master)
-	if err != nil {
-		log.Printf("[ERROR] Pty: Cannot get slave %s",err)
-		return err
-	}
-
-	log.Printf("[DEBUG] Pty: slave name: %s",sname)
-
-	// Keep the pty open so that the other end can close/open at will without causing an EOF error
-	x, err := syscall.Open(sname, syscall.O_RDWR|syscall.O_NOCTTY, 0620 )
-	if err != nil {
-		log.Printf("[ERROR] Pty: Cannot open slave %s",err)
-		return err
-	}
-
-	p.portName = sname
-	p.ptmx = master
-	p.slave = x
+	p.portPair = *pt
 	p.state = STATE_OPEN
 	return nil
 }
@@ -181,31 +202,21 @@ func (p *pty) GetType() int {
 func (p *pty) GetName() string {
 	return p.portName
 }
-func (p *pty) CreateQueue() (*modules.QueuePair, error)  {
 
-	if p.queue != nil {
-		return nil, fmt.Errorf("Module supports only one queue")
-	}
-	p.queue = &modules.QueuePair{
-		Read:  make(chan modules.Message),
-		Write: make(chan modules.Message),
-		Ctl:   make(chan bool),
-
-	}
-	return p.queue, nil
+func (p *pty) GetUUID() string {
+	return p.uuid
 }
 
 func (p *pty) ConnectQueuePair(q *modules.QueuePair) error  {
 	return fmt.Errorf("Not supported")
 }
 
-func (p *pty) GetQueues() []*modules.QueuePair {
-	return []*modules.QueuePair{p.queue}
+func (p *pty) GetQueues() *modules.QueuePair {
+	return p.queue
 }
 
 // Reads from a pair of downstream
 // and write to a serial Port
-// TODO provide the notion of command with a separator
 func (p *pty) Open()  error {
 
 	if err := p.ptyOpen(); err != nil {
@@ -220,6 +231,18 @@ func (p *pty) Open()  error {
 }
 
 func NewPty() modules.Module {
+	q := &modules.QueuePair{
+		Read:  make(chan modules.Message),
+		Write: make(chan modules.Message),
+		Ctl:   make(chan bool),
 
-	return &pty {}
+	}
+	id, err := uuid.GenerateUUID()
+	if err != nil {
+		panic(err)
+	}
+	return &pty {
+		queue: q,
+		uuid: id,
+	}
 }

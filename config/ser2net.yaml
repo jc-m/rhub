@@ -1,0 +1,20 @@
+streams:
+   - name : ser2net
+     modules :
+       - name     : pipe
+         module   : pipe
+       - name     : serial
+         module   : serial
+         upstream : pipe
+         config:
+            port  : 7375
+            bind  : 0.0.0.0/0
+       - name     : net
+         module   : tcp_server
+         upstream : pipe
+         config:
+            port   : /dev/ttys012
+            baud   : 38400
+            parity : N
+            bits   : 8
+            stop   : 1

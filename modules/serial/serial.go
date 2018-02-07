@@ -6,6 +6,7 @@ import (
 	"io"
 	"github.com/jc-m/rhub/modules"
 	"fmt"
+	"github.com/hashicorp/go-uuid"
 )
 
 
@@ -23,6 +24,7 @@ type serialPort struct {
 	queue      *modules.QueuePair
 	state      byte
 	port       io.ReadWriteCloser
+	uuid       string
 }
 
 func (m *serialPort) serialOpen() error {
@@ -109,7 +111,9 @@ func (m *serialPort) receiveloop() {
 			}
 		}
 
-		// TODO address if n == 0
+		if err == nil {
+			log.Print("[DEBUG] Serial  Null Read")
+		}
 
 		if m.state == STATE_CLOSED {
 			break
@@ -123,6 +127,9 @@ func (m *serialPort) GetName() string {
 	return m.config.Port
 }
 
+func (m *serialPort) GetUUID() string {
+	return m.uuid
+}
 func (m *serialPort) GetType() int {
 	return modules.DRIVER
 }
@@ -154,31 +161,29 @@ func (m *serialPort) Open()  error {
 	return nil
 }
 
-func (m *serialPort) CreateQueue() (*modules.QueuePair, error)  {
+func (m *serialPort) ConnectQueuePair(q *modules.QueuePair) error  {
+	return fmt.Errorf("Not supported")
+}
 
-	if m.queue != nil {
-		return nil, fmt.Errorf("Module supports only one queue")
-	}
-	m.queue = &modules.QueuePair{
+func (m *serialPort) GetQueues() *modules.QueuePair {
+	return m.queue
+}
+
+func NewSerial(c SerialConfig) modules.Module {
+	q := &modules.QueuePair{
 		Read:  make(chan modules.Message),
 		Write: make(chan modules.Message),
 		Ctl:   make(chan bool),
 
 	}
-	return m.queue, nil
-}
-
-func (m *serialPort) ConnectQueuePair(q *modules.QueuePair) error  {
-	return fmt.Errorf("Not supported")
-}
-
-func (m *serialPort) GetQueues() []*modules.QueuePair {
-	return []*modules.QueuePair{m.queue}
-}
-
-func NewSerial(c SerialConfig) modules.Module {
+	id, err := uuid.GenerateUUID()
+	if err != nil {
+		panic(err)
+	}
 	return &serialPort{
 		config:     c,
+		queue: q,
 		state:      STATE_CLOSED,
+		uuid: id,
 	}
 }

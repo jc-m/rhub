@@ -30,9 +30,9 @@ type QueuePair struct {
 type Module interface {
 	Open() error
 	GetName() string
+	GetUUID() string
 	GetType() int
-	CreateQueue() (*QueuePair, error)
-	GetQueues() []*QueuePair
+	GetQueues() *QueuePair
 	ConnectQueuePair(*QueuePair) error
 	Close()
 }
@@ -56,7 +56,7 @@ func (m *NotImplemented) CreateQueue() (*QueuePair, error)  {
 	return nil, fmt.Errorf("Not implemented")
 }
 
-func (m *NotImplemented) GetQueues() []*QueuePair {
+func (m *NotImplemented) GetQueues() *QueuePair {
 	return nil
 }
 

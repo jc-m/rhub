@@ -16,7 +16,7 @@ func TestRadio(t *testing.T) {
 
 
 	r := New()
-	q, _ := r.CreateQueue()
+	q := r.GetQueues()
 
 	r.ConnectQueuePair(&modules.QueuePair{Read: upstreamWR, Write: upstreamRD, Ctl:ctl})
 

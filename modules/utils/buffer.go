@@ -6,6 +6,7 @@ import (
 	"log"
 	"bytes"
 	"io"
+	"github.com/hashicorp/go-uuid"
 )
 
 type cmdBuffer struct {
@@ -14,6 +15,7 @@ type cmdBuffer struct {
 	connected  *modules.QueuePair
 	buffer *bytes.Buffer
 	name string
+	uuid string
 }
 
 type Config struct {
@@ -28,18 +30,8 @@ func (r *cmdBuffer) GetName() string {
 	return r.name
 }
 
-func (r *cmdBuffer) CreateQueue() (*modules.QueuePair, error)  {
-
-	if r.queue != nil {
-		return nil, fmt.Errorf("Module supports only one queue")
-	}
-	r.queue = &modules.QueuePair{
-		Read:  make(chan modules.Message),
-		Write: make(chan modules.Message),
-		Ctl:   make(chan bool),
-
-	}
-	return r.queue, nil
+func (r *cmdBuffer) GetUUID() string {
+	return r.uuid
 }
 
 func (r *cmdBuffer) ConnectQueuePair(q *modules.QueuePair) error  {
@@ -50,8 +42,8 @@ func (r *cmdBuffer) ConnectQueuePair(q *modules.QueuePair) error  {
 	return nil
 }
 
-func (r *cmdBuffer) GetQueues() []*modules.QueuePair {
-	return []*modules.QueuePair{r.queue}
+func (r *cmdBuffer) GetQueues() *modules.QueuePair {
+	return r.queue
 }
 
 
@@ -71,18 +63,18 @@ func (r *cmdBuffer) downstreamLoop() {
 									r.buffer.Write(l)
 								}
 							} else {
-								log.Printf("[ERROR] RadioModel: Error reading buffer: %s", err)
+								log.Printf("[ERROR] Buffer: Error reading buffer: %s", err)
 							}
 							break
 						}
-						log.Printf("[DEBUG] RadioModel: Received command: %s", string(l))
+						log.Printf("[DEBUG] Buffer: Received command: %s", string(l))
 
 						r.connected.Write <- modules.Message{Body: l}
-						log.Printf("[DEBUG] RadioModel: Sent command: %s", string(l))
+						log.Printf("[DEBUG] Buffer: Sent command: %s", string(l))
 					}
 				}
 		case <-r.queue.Ctl:
-			log.Print("[DEBUG] RadioModel: Terminating upper loop")
+			log.Print("[DEBUG] Buffer: Terminating upper loop")
 			return
 		default:
 		}
@@ -94,9 +86,9 @@ func (r *cmdBuffer) upstreamLoop(pairId int) {
 		select {
 		case buff := <-r.connected.Read:
 			r.queue.Write <- buff
-			log.Printf("[DEBUG] RadioModel: Sent command: %s", string(buff.Body))
+			log.Printf("[DEBUG] Buffer: Sent command: %s", string(buff.Body))
 		case <-r.connected.Ctl:
-			log.Print("[DEBUG] RadioModel: Terminating upper loop")
+			log.Print("[DEBUG] Buffer: Terminating upper loop")
 			return
 		}
 	}
@@ -112,9 +104,21 @@ func (r *cmdBuffer) Close() {
 }
 
 func NewCmdBuffer(conf Config) modules.Module {
+	q := &modules.QueuePair{
+		Read:  make(chan modules.Message),
+		Write: make(chan modules.Message),
+		Ctl:   make(chan bool),
+
+	}
+	id, err := uuid.GenerateUUID()
+	if err != nil {
+		panic(err)
+	}
 
 	return &cmdBuffer{
 		buffer: bytes.NewBuffer([]byte{}),
+		queue: q,
 		config: conf,
+		uuid: id,
 	}
 }

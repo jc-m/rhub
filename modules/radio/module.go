@@ -8,12 +8,15 @@ import (
 	"log"
 	"github.com/jc-m/rhub/modules/radio/rigs"
 	"github.com/jc-m/rhub/modules/radio/rigs/ft991a"
+	"github.com/hashicorp/go-uuid"
+	"golang.org/x/tools/go/gcimporter15/testdata"
 )
 
 type rig struct {
 	connected  *modules.QueuePair
 	queue      *modules.QueuePair
 	driver     rigs.Rig
+	uuid       string
 }
 
 
@@ -62,26 +65,16 @@ func (m *rig) GetName() string {
 	return ""
 }
 
+func (m *rig) GetUUID() string {
+	return m.uuid
+}
+
 func (m *rig) GetType() int {
 	return modules.MUX
 }
 
-func (m *rig) CreateQueue() (*modules.QueuePair, error)  {
-
-	if m.queue != nil {
-		return nil, fmt.Errorf("Module supports only one queue")
-	}
-	m.queue = &modules.QueuePair{
-		Read:  make(chan modules.Message),
-		Write: make(chan modules.Message),
-		Ctl:   make(chan bool),
-
-	}
-	return m.queue, nil
-}
-
-func (m *rig) GetQueues() []*modules.QueuePair {
-	return nil
+func (m *rig) GetQueues() *modules.QueuePair {
+	return m.queue
 }
 
 func (m *rig) ConnectQueuePair(q *modules.QueuePair) error  {
@@ -98,8 +91,20 @@ func (m *rig) Close() {
 
 
 func New() modules.Module {
+	q := &modules.QueuePair{
+		Read:  make(chan modules.Message),
+		Write: make(chan modules.Message),
+		Ctl:   make(chan bool),
+
+	}
+	id, err := uuid.GenerateUUID()
+	if err != nil {
+		panic(err)
+	}
 
 	return &rig {
+		queue: q,
 		driver: ft991a.New(),
+		uuid: id,
 	}
 }

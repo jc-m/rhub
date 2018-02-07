@@ -15,15 +15,11 @@ func TestSerial(t *testing.T) {
 			DataBits:8,
 			StopBits:2,
 		}
-		channels := modules.QueuePair{
-			Read : make(chan modules.Message),
-			Write : make(chan modules.Message),
-			Ctl :  make(chan bool),
-		}
+
 
 
 		client := NewSerial(c)
-		client.AddDownstream(channels)
+		channels:= client.GetQueues()
 
 		err := client.Open()
 		if err != nil {

@@ -16,7 +16,7 @@ func TestBuffer(t *testing.T) {
 		Delimiter: ';',
 	}
 	c := NewCmdBuffer(conf)
-	q, _ := c.CreateQueue()
+	q := c.GetQueues()
 	c.ConnectQueuePair(&modules.QueuePair{Read:downstreamRD, Write:downstreamWR, Ctl:ctl})
 
 

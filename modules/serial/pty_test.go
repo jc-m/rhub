@@ -7,10 +7,7 @@ import (
 func TestPTY(t *testing.T) {
 
 	pty := NewPty()
-	q, err := pty.CreateQueue()
-	if err != nil {
-		t.Fatalf("Unexpected number of queue")
-	}
+	q := pty.GetQueues()
 
 	if err:= pty.Open(); err != nil {
 		t.Fatalf("Cannot open port %s", err)

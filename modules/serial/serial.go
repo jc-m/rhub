@@ -4,9 +4,10 @@ import (
 	"github.com/jacobsa/go-serial/serial"
 	"log"
 	"io"
-	"github.com/jc-m/rhub/modules"
+	. "github.com/jc-m/rhub/modules"
 	"fmt"
 	"github.com/hashicorp/go-uuid"
+	"strconv"
 )
 
 
@@ -21,10 +22,14 @@ type SerialConfig struct {
 
 type serialPort struct {
 	config     SerialConfig
-	queue      *modules.QueuePair
+	queue      *QueuePair
 	state      byte
 	port       io.ReadWriteCloser
 	uuid       string
+}
+
+func init() {
+	Register("serial", NewSerial)
 }
 
 func (m *serialPort) serialOpen() error {
@@ -98,7 +103,7 @@ func (m *serialPort) receiveloop() {
 			copy(b, buffer[:n])
 			log.Printf("[DEBUG] SerialClient: Sending %+v", b)
 
-			m.queue.Write <- modules.Message{Id:m.config.Port, Body:b}
+			m.queue.Write <- Message{Id:m.config.Port, Body:b}
 		}
 
 		if err != nil {
@@ -131,7 +136,7 @@ func (m *serialPort) GetUUID() string {
 	return m.uuid
 }
 func (m *serialPort) GetType() int {
-	return modules.DRIVER
+	return DRIVER
 }
 
 
@@ -161,18 +166,33 @@ func (m *serialPort) Open()  error {
 	return nil
 }
 
-func (m *serialPort) ConnectQueuePair(q *modules.QueuePair) error  {
+func (m *serialPort) ConnectQueuePair(q *QueuePair) error  {
 	return fmt.Errorf("Not supported")
 }
 
-func (m *serialPort) GetQueues() *modules.QueuePair {
+func (m *serialPort) GetQueues() *QueuePair {
 	return m.queue
 }
 
-func NewSerial(c SerialConfig) modules.Module {
-	q := &modules.QueuePair{
-		Read:  make(chan modules.Message),
-		Write: make(chan modules.Message),
+func getConfig(conf ModuleConfig) (SerialConfig, error) {
+	c := SerialConfig{}
+	if port, ok := conf["port"]; ok {
+		c.Port = port
+	}
+	if baud, ok := conf["baud"]; ok {
+		if v, err := strconv.Atoi(baud); err == nil {
+			c.Baud = uint(v)
+		} else {
+			return c, fmt.Errorf("Invalid Baud value")
+		}
+	}
+	return c, nil
+}
+func NewSerial(conf ModuleConfig) (Module, error) {
+	out := &serialPort{}
+	out.queue = &QueuePair{
+		Read:  make(chan Message),
+		Write: make(chan Message),
 		Ctl:   make(chan bool),
 
 	}
@@ -180,10 +200,14 @@ func NewSerial(c SerialConfig) modules.Module {
 	if err != nil {
 		panic(err)
 	}
-	return &serialPort{
-		config:     c,
-		queue: q,
-		state:      STATE_CLOSED,
-		uuid: id,
+	out.uuid = id
+	out.state = STATE_CLOSED
+
+	if c, err := getConfig( conf ); err != nil {
+		return nil, err
+	} else {
+		out.config = c
 	}
+
+	return out, nil
 }

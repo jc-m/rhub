@@ -2,24 +2,26 @@ package radio
 
 import (
 	"fmt"
-	"github.com/jc-m/rhub/modules"
+	. "github.com/jc-m/rhub/modules"
 	"bytes"
 	"encoding/gob"
 	"log"
 	"github.com/jc-m/rhub/modules/radio/rigs"
 	"github.com/jc-m/rhub/modules/radio/rigs/ft991a"
 	"github.com/hashicorp/go-uuid"
-	"golang.org/x/tools/go/gcimporter15/testdata"
 )
 
 type rig struct {
-	connected  *modules.QueuePair
-	queue      *modules.QueuePair
+	connected  *QueuePair
+	queue      *QueuePair
 	driver     rigs.Rig
 	uuid       string
 }
 
 
+func init() {
+	Register("radio", New)
+}
 
 func getBytes(msg interface{}) ([]byte, error) {
 	var buf bytes.Buffer
@@ -37,7 +39,7 @@ func (m *rig) upstreamLoop() {
 		case buff := <-m.connected.Read:
 			if resp, err := m.driver.OnCatUpStream(string(buff.Body)); err == nil {
 				if buff, err := getBytes(resp); err == nil {
-					m.queue.Write <- modules.Message{Body:buff}
+					m.queue.Write <- Message{Body:buff}
 				} else {
 					log.Print("[DEBUG] FT991A: Error Encoding message")
 				}
@@ -70,14 +72,14 @@ func (m *rig) GetUUID() string {
 }
 
 func (m *rig) GetType() int {
-	return modules.MUX
+	return MUX
 }
 
-func (m *rig) GetQueues() *modules.QueuePair {
+func (m *rig) GetQueues() *QueuePair {
 	return m.queue
 }
 
-func (m *rig) ConnectQueuePair(q *modules.QueuePair) error  {
+func (m *rig) ConnectQueuePair(q *QueuePair) error  {
 	if m.connected != nil {
 		return fmt.Errorf("Module supports only one connection")
 	}
@@ -90,10 +92,10 @@ func (m *rig) Close() {
 }
 
 
-func New() modules.Module {
-	q := &modules.QueuePair{
-		Read:  make(chan modules.Message),
-		Write: make(chan modules.Message),
+func New(conf ModuleConfig) (Module, error) {
+	q := &QueuePair{
+		Read:  make(chan Message),
+		Write: make(chan Message),
 		Ctl:   make(chan bool),
 
 	}
@@ -106,5 +108,5 @@ func New() modules.Module {
 		queue: q,
 		driver: ft991a.New(),
 		uuid: id,
-	}
+	}, nil
 }

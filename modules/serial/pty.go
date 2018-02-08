@@ -11,13 +11,13 @@ import (
 	"unsafe"
 	"errors"
 	"io"
-	"github.com/jc-m/rhub/modules"
+	. "github.com/jc-m/rhub/modules"
 	"fmt"
 	"github.com/hashicorp/go-uuid"
 )
 
 type pty struct {
-	queue      *modules.QueuePair
+	queue      *QueuePair
 	portPair
 	state      byte
 	uuid       string
@@ -29,6 +29,10 @@ type portPair struct {
 	portName   string
 }
 
+func init() {
+	Register("pty", NewPty)
+}
+
 func ioctl(fd uintptr, flag, data uintptr) error {
 	if _, _, err := syscall.Syscall(syscall.SYS_IOCTL, fd, flag, data); err != 0 {
 		return err
@@ -36,6 +40,7 @@ func ioctl(fd uintptr, flag, data uintptr) error {
 
 	return nil
 }
+
 func _IOC_PARM_LEN(ioctl uintptr) uintptr {
 	const 	(
 		_IOC_PARAM_SHIFT = 13
@@ -132,7 +137,7 @@ func (p *pty) receiveloop() {
 			copy(b, buffer[:n])
 			log.Printf("[DEBUG] Pty: Sending %+v", b)
 
-			p.queue.Write <- modules.Message{Id:p.portName, Body:b}
+			p.queue.Write <- Message{Id:p.portName, Body:b}
 		}
 		if n <= 0 {
 			if err != nil {
@@ -196,7 +201,7 @@ func (p *pty) Close() {
 }
 
 func (p *pty) GetType() int {
-	return modules.DRIVER
+	return DRIVER
 }
 
 func (p *pty) GetName() string {
@@ -207,11 +212,11 @@ func (p *pty) GetUUID() string {
 	return p.uuid
 }
 
-func (p *pty) ConnectQueuePair(q *modules.QueuePair) error  {
+func (p *pty) ConnectQueuePair(q *QueuePair) error  {
 	return fmt.Errorf("Not supported")
 }
 
-func (p *pty) GetQueues() *modules.QueuePair {
+func (p *pty) GetQueues() *QueuePair {
 	return p.queue
 }
 
@@ -230,10 +235,10 @@ func (p *pty) Open()  error {
 	return nil
 }
 
-func NewPty() modules.Module {
-	q := &modules.QueuePair{
-		Read:  make(chan modules.Message),
-		Write: make(chan modules.Message),
+func NewPty(conf ModuleConfig) (Module, error) {
+	q := &QueuePair{
+		Read:  make(chan Message),
+		Write: make(chan Message),
 		Ctl:   make(chan bool),
 
 	}
@@ -244,5 +249,5 @@ func NewPty() modules.Module {
 	return &pty {
 		queue: q,
 		uuid: id,
-	}
+	}, nil
 }

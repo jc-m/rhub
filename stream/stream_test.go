@@ -2,40 +2,40 @@ package stream
 
 import (
 	"testing"
-	"github.com/jc-m/rhub/modules/serial"
-	"github.com/jc-m/rhub/modules/utils"
+	"github.com/jc-m/rhub/config"
 )
 
-func TestStream(t *testing.T) {
+func TestNew(t *testing.T) {
 
-	c := serial.SerialConfig{
-		Port: "/dev/ttys012",
-		Baud: 38400,
-		DataBits:8,
-		StopBits:2,
+
+	mods := []config.Module{
+		{"serial", "serial", "pipe", map[string]string{"port":"/dev/ttys012"} },
+		{"pty", "pty", "pipe", map[string]string{} },
+		{"pipe", "pipe", "", map[string]string{"tap":"false"} },
 	}
 
-	serPort := serial.NewSerial(c)
-	ptyPort := serial.NewPty()
-	pipe := utils.NewPipe()
+	conf := config.Stream{
+		Name: "test",
+		Modules: mods,
+	}
+	s := NewStream(conf)
 
-	s := NewStream()
-
-	if err := s.Push(ptyPort, pipe); err != nil {
-		t.Fatal(err)
+	if len(s.NodeMap) != len(mods) {
+		t.Fatalf("Missing modules")
 	}
 
-	if err := s.Push(serPort, pipe); err != nil {
-		t.Fatal(err)
+	for k,v := range s.Index {
+		t.Logf("%+v", v)
+
+		if k == "pty" || k == "serial" {
+			if v.Upstream[0] != "pipe" {
+				t.Logf("Invalid upstream %+v", v)
+			}
+		}
+		if k == "pipe" {
+			if len(v.Upstream) >0 {
+				t.Logf("Invalid upstream %+v", v)
+			}
+		}
 	}
-	for k := range s.NodeMap {
-		t.Logf("Module %+v",k)
-
-	}
-
-	// need to open the pty and test
-	s.Start()
-
-	<- pipe.GetQueues().Ctl
-
 }

@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"github.com/jc-m/rhub/modules"
+	. "github.com/jc-m/rhub/modules"
 	"fmt"
 	"log"
 	"bytes"
@@ -11,14 +11,23 @@ import (
 // pipe with tap
 
 type pipeModule struct {
-	queue *modules.QueuePair
-	connected  []*modules.QueuePair
+	config PipeConfig
+	queue *QueuePair
+	connected []*QueuePair
 	buffer *bytes.Buffer
 	uuid string
 }
 
+type PipeConfig struct {
+	Tap bool
+}
+
+func init() {
+	Register("pipe", NewPipe)
+}
+
 func (r *pipeModule) GetType() int {
-	return modules.MUX
+	return MUX
 }
 
 func (r *pipeModule) GetName() string {
@@ -29,7 +38,7 @@ func (r *pipeModule) GetUUID() string {
 	return r.uuid
 }
 
-func (r *pipeModule) ConnectQueuePair(q *modules.QueuePair) error  {
+func (r *pipeModule) ConnectQueuePair(q *QueuePair) error  {
 	if len(r.connected) >1  {
 		return fmt.Errorf("Module supports only two connection")
 	}
@@ -37,7 +46,7 @@ func (r *pipeModule) ConnectQueuePair(q *modules.QueuePair) error  {
 	return nil
 }
 
-func (r *pipeModule) GetQueues() *modules.QueuePair {
+func (r *pipeModule) GetQueues() *QueuePair {
 	return r.queue
 }
 
@@ -48,9 +57,15 @@ func (r *pipeModule) pipeLoop() {
 		case msg := <-r.connected[0].Write:
 			log.Printf("[DEBUG] Pipe: Received on 0 %+v", msg)
 			r.connected[1].Read <- msg
+			if r.config.Tap {
+				r.queue.Write <- msg
+			}
 		case msg := <-r.connected[1].Write:
 			log.Printf("[DEBUG] Pipe: Received on 1 %+v", msg)
 			r.connected[0].Read <- msg
+			if r.config.Tap {
+				r.queue.Write <- msg
+			}
 		case <-r.queue.Ctl:
 			log.Print("[DEBUG] Pipe: Terminating  loop")
 			return
@@ -67,11 +82,28 @@ func (r *pipeModule) Open()  error {
 func (r *pipeModule) Close() {
 }
 
-func NewPipe() modules.Module {
+func getConfig(conf ModuleConfig) (PipeConfig, error) {
+	c := PipeConfig{}
+	if tap, ok := conf["tap"]; ok {
+		switch tap{
+		case "true":
+			c.Tap = true
+		case "false":
+			c.Tap = true
+		default:
+			return c, fmt.Errorf("invalid tap value")
+		}
+	}
+	return c, nil
+}
 
-	q := &modules.QueuePair{
-		Read:  make(chan modules.Message),
-		Write: make(chan modules.Message),
+func NewPipe(conf ModuleConfig) (Module, error) {
+	out := &pipeModule{
+		buffer: bytes.NewBuffer([]byte{}),
+	}
+	out.queue = &QueuePair{
+		Read:  make(chan Message),
+		Write: make(chan Message),
 		Ctl:   make(chan bool),
 
 	}
@@ -79,9 +111,6 @@ func NewPipe() modules.Module {
 	if err != nil {
 		panic(err)
 	}
-	return &pipeModule{
-		buffer: bytes.NewBuffer([]byte{}),
-		queue: q,
-		uuid: id,
-	}
+	out.uuid = id
+	return out, nil
 }

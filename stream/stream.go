@@ -1,9 +1,14 @@
 package stream
 
 import (
-	"github.com/jc-m/rhub/modules"
 	"fmt"
 	"log"
+	"github.com/jc-m/rhub/config"
+	"github.com/jc-m/rhub/modules"
+	_ "github.com/jc-m/rhub/modules/network"
+	_ "github.com/jc-m/rhub/modules/serial"
+	_ "github.com/jc-m/rhub/modules/radio"
+	_ "github.com/jc-m/rhub/modules/utils"
 )
 
 
@@ -76,12 +81,32 @@ type Stream struct {
 	vertices map[string][]string
 }
 
-func NewStream() *Stream {
-	return &Stream {
+func NewStream(conf config.Stream) *Stream {
+	s := &Stream {
 		NodeMap: make(map[*Node]bool),
 		Index:make(map[string]*Node),
 		vertices: make(map[string][]string),
 	}
+
+	for _, m := range conf.Modules {
+		if mod, err  := modules.GetModule(m.Module, m.Config); err == nil {
+			s.AddNode(m.Name, mod)
+		} else {
+			log.Print(err)
+		}
+	}
+	for _, m := range conf.Modules {
+		node := s.Index[m.Name]
+		if m.Upstream != "" {
+			if up, ok := s.Index[m.Upstream]; ok {
+				if err := node.Push(up); err != nil {
+					log.Fatal(err)
+				}
+			}
+		}
+	}
+
+	return s
 }
 
 func NewNode(id string, mod modules.Module) *Node {
@@ -107,33 +132,22 @@ func (n *Node) Start() error {
 	return n.Module.Open()
 }
 
-func (s *Stream) AddNode(id string, mod modules.Module) *Node {
+func (n *Node) Push(upper *Node) error {
+	log.Printf("[DEBUG] Stream: Pushing : %s on %s", n.Id, upper.Id)
+
+	return n.Connect(upper)
+}
+
+func (s *Stream) AddNode(name string, mod modules.Module) *Node {
 	if n, ok := s.Index[mod.GetUUID()]; ok {
 		return n
 	} else {
-		log.Printf("[DEBUG] Stream: Adding Node : %s", mod.GetUUID())
-		n = NewNode(id, mod)
+		log.Printf("[DEBUG] Stream: Adding %s : %s", name, mod.GetUUID())
+		n = NewNode(name, mod)
 		s.NodeMap[n] = true
 		s.Index[n.Id] = n
 		return n
 	}
-}
-
-func (s *Stream) Push(lower, upper modules.Module) error {
-
-	if lower == nil {
-		return fmt.Errorf("Lower module is required")
-	}
-	lowerNode := s.AddNode(lower.GetUUID(), lower)
-
-	if upper == nil {
-		// done
-		return nil
-	}
-
-	upperNode := s.AddNode(upper.GetUUID(), upper)
-
-	return lowerNode.Connect(upperNode)
 }
 
 func (s *Stream) startNode(node *Node) error {

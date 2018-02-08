@@ -12,7 +12,7 @@ func TestBuffer(t *testing.T) {
 
 	ctl := make(chan bool)
 
-	conf := Config{
+	conf := BufferConfig{
 		Delimiter: ';',
 	}
 	c := NewCmdBuffer(conf)

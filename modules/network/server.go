@@ -1,22 +1,29 @@
 package network
 
 import (
-	"github.com/jc-m/rhub/modules"
+	. "github.com/jc-m/rhub/modules"
 	"fmt"
 	"net"
 	"log"
+	"github.com/hashicorp/go-uuid"
 )
 
 type tcpServ struct {
-	queue   *modules.QueuePair
+	queue   *QueuePair
 	address string
 	listener net.Listener
 	state byte
+	uuid string
 }
 
 type connection struct {
 	conn net.Conn
 	server *tcpServ
+}
+
+func init() {
+	log.Printf("Init tcp_server")
+	Register("tcp_server", NewTCPServ)
 }
 
 func (c *connection) receiveloop(){
@@ -35,7 +42,7 @@ func (c *connection) receiveloop(){
 
 			log.Printf("[DEBUG] TCPServer: Sending %+v", b)
 			// needs to have the client address instead
-			c.server.queue.Write <- modules.Message{Id:c.conn.RemoteAddr().String(), Body:b}
+			c.server.queue.Write <- Message{Id:c.conn.RemoteAddr().String(), Body:b}
 		}
 	}
 	log.Print("[DEBUG] TCPServer: Closing receiveloop")
@@ -64,11 +71,15 @@ func (c *connection) sendloop() {
 	}
 }
 func (t *tcpServ) GetType() int {
-	return modules.DRIVER
+	return DRIVER
 }
 
 func (t *tcpServ) GetName() string {
 	return t.address
+}
+
+func (t *tcpServ) GetUUID() string {
+	return t.uuid
 }
 
 func (t *tcpServ) Close() {
@@ -102,32 +113,32 @@ func (t *tcpServ) Open()  error {
 	return nil
 }
 
-func (t *tcpServ) CreateQueue() (*modules.QueuePair, error)  {
-	if t.queue != nil {
-		return nil, fmt.Errorf("Module supports only one queue")
-	}
-	t.queue = &modules.QueuePair{
-		Read:  make(chan modules.Message),
-		Write: make(chan modules.Message),
-		Ctl:   make(chan bool),
-
-	}
-	return t.queue, nil
-}
-
-func (t *tcpServ) ConnectQueuePair(q *modules.QueuePair) error  {
+func (t *tcpServ) ConnectQueuePair(q *QueuePair) error  {
 	return fmt.Errorf("Not supported")
 }
 
-func (t *tcpServ) GetQueues() []*modules.QueuePair {
-	return []*modules.QueuePair{t.queue}
+func (t *tcpServ) GetQueues() *QueuePair {
+	return t.queue
 }
 
 
-// c is a string in the form of what Go Net package accept for dial
-func NewTCPServ(address string) modules.Module {
+func NewTCPServ(conf ModuleConfig) (Module, error) {
+
+	q := &QueuePair{
+		Read:  make(chan Message),
+		Write: make(chan Message),
+		Ctl:   make(chan bool),
+
+	}
+
+	id, err := uuid.GenerateUUID()
+	if err != nil {
+		panic(err)
+	}
 
 	return &tcpServ {
-		address : address,
-	}
+		address : conf["address"],
+		uuid: id,
+		queue: q,
+	}, nil
 }

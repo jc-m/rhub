@@ -3,16 +3,18 @@ streams:
      modules :
        - name     : pipe
          module   : pipe
+         config :
+           tap  : true
        - name     : serial
          module   : serial
          upstream : pipe
-         config:
-            port  : 7375
-            bind  : 0.0.0.0/0
+         config  :
+            port : 7375
+            bind : 0.0.0.0/0
        - name     : net
          module   : tcp_server
          upstream : pipe
-         config:
+         config    :
             port   : /dev/ttys012
             baud   : 38400
             parity : N

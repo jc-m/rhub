@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"github.com/jc-m/rhub/modules"
+	. "github.com/jc-m/rhub/modules"
 	"fmt"
 	"log"
 	"bytes"
@@ -10,20 +10,24 @@ import (
 )
 
 type cmdBuffer struct {
-	config Config
-	queue      *modules.QueuePair
-	connected  *modules.QueuePair
+	config BufferConfig
+	queue      *QueuePair
+	connected  *QueuePair
 	buffer *bytes.Buffer
 	name string
 	uuid string
 }
 
-type Config struct {
+type BufferConfig struct {
 	Delimiter byte
 }
 
+func init() {
+	Register("buffer", NewCmdBuffer)
+}
+
 func (r *cmdBuffer) GetType() int {
-	return modules.MODULE
+	return MODULE
 }
 
 func (r *cmdBuffer) GetName() string {
@@ -34,7 +38,7 @@ func (r *cmdBuffer) GetUUID() string {
 	return r.uuid
 }
 
-func (r *cmdBuffer) ConnectQueuePair(q *modules.QueuePair) error  {
+func (r *cmdBuffer) ConnectQueuePair(q *QueuePair) error  {
 	if r.connected != nil {
 		return fmt.Errorf("Module supports only one connection")
 	}
@@ -42,7 +46,7 @@ func (r *cmdBuffer) ConnectQueuePair(q *modules.QueuePair) error  {
 	return nil
 }
 
-func (r *cmdBuffer) GetQueues() *modules.QueuePair {
+func (r *cmdBuffer) GetQueues() *QueuePair {
 	return r.queue
 }
 
@@ -69,7 +73,7 @@ func (r *cmdBuffer) downstreamLoop() {
 						}
 						log.Printf("[DEBUG] Buffer: Received command: %s", string(l))
 
-						r.connected.Write <- modules.Message{Body: l}
+						r.connected.Write <- Message{Body: l}
 						log.Printf("[DEBUG] Buffer: Sent command: %s", string(l))
 					}
 				}
@@ -103,10 +107,10 @@ func (r *cmdBuffer) Open()  error {
 func (r *cmdBuffer) Close() {
 }
 
-func NewCmdBuffer(conf Config) modules.Module {
-	q := &modules.QueuePair{
-		Read:  make(chan modules.Message),
-		Write: make(chan modules.Message),
+func NewCmdBuffer(conf ModuleConfig) (Module, error) {
+	q := &QueuePair{
+		Read:  make(chan Message),
+		Write: make(chan Message),
 		Ctl:   make(chan bool),
 
 	}
@@ -114,11 +118,14 @@ func NewCmdBuffer(conf Config) modules.Module {
 	if err != nil {
 		panic(err)
 	}
-
+	// TODO make this more robust
+	c := BufferConfig {
+		Delimiter: byte(conf["delimiter"][0]),
+	}
 	return &cmdBuffer{
 		buffer: bytes.NewBuffer([]byte{}),
 		queue: q,
-		config: conf,
+		config: c,
 		uuid: id,
-	}
+	}, nil
 }

@@ -2,6 +2,7 @@ package modules
 
 import (
 	"fmt"
+	"log"
 )
 
 // DRIVER modules only have one pair of channels, and are communicating with the network or a device on the other side.
@@ -26,6 +27,11 @@ type QueuePair struct {
 	Ctl chan bool
 }
 
+type ModuleConfig map[string]string
+
+type InitFunc func(ModuleConfig) (Module, error)
+
+var ModuleMap map[string]InitFunc
 
 type Module interface {
 	Open() error
@@ -35,6 +41,28 @@ type Module interface {
 	GetQueues() *QueuePair
 	ConnectQueuePair(*QueuePair) error
 	Close()
+}
+
+func init() {
+	ModuleMap = make(map[string]InitFunc)
+}
+
+func Register(name string, f InitFunc ) error {
+	if _, exists := ModuleMap[name]; exists {
+		panic("Module registered multiple time")
+	}
+	log.Printf("[DEBUG] Module : Registering %s", name)
+
+	ModuleMap[name] = f
+
+	return nil
+}
+
+func GetModule(name string, conf ModuleConfig) (Module, error) {
+	if f, ok := ModuleMap[name]; ok {
+		return f(conf)
+	}
+	return nil, fmt.Errorf("Unknown module %s", name)
 }
 
 type NotImplemented struct {}

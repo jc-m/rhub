@@ -8,8 +8,10 @@ import (
 func TestTcpServer(t *testing.T) {
 
 
-	srv := NewTCPServ(modules.ModuleConfig{"address":":7375"})
-
+	srv, err := NewTCPServ(modules.ModuleConfig{"address":":7375"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := srv.Open(); err != nil {
 		t.Fatalf("Cannot open server %s", err)
 	}

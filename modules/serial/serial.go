@@ -23,9 +23,10 @@ type SerialConfig struct {
 type serialPort struct {
 	config     SerialConfig
 	queue      *QueuePair
-	state      byte
+	state      int
 	port       io.ReadWriteCloser
 	uuid       string
+	portState  int
 }
 
 func init() {
@@ -57,12 +58,12 @@ func (m *serialPort) serialOpen() error {
 		MinimumReadSize: 1,
 		}
 
-	port, err := serial.Open(conf)
-	if err != nil {
-		log.Printf("[ERROR] SerialClient: Cannot open port %s",err)
-		return err
-	}
-	m.port = port
+		port, err := serial.Open(conf)
+		if err != nil {
+			return err
+		}
+		m.port = port
+	m.portState = PORT_OPEN
 	return nil
 }
 
@@ -75,20 +76,36 @@ func (m *serialPort) serialWrite(buff []byte) int {
 	return n
 }
 
+func (m *serialPort) serialClose() {
+	log.Print("[DEBUG] SerialClient: closing port")
+	m.portState = PORT_CLOSED
+	m.port.Close()
+}
+
 func (m *serialPort) sendloop() {
 	for {
 		select {
 		case r := <-m.queue.Read:
-			if m.state == STATE_CLOSED {
+			if m.portState == PORT_CLOSED {
+				log.Print("[DEBUG] SerialClient: closing send loop")
 				return
 			}
+			log.Print("[DEBUG] SerialClient: Writing ...")
+
 			m.serialWrite(r.Body)
-		case <-m.queue.Ctl:
-			log.Print("[DEBUG] SerialClient: Terminating Sending loop")
-			return
 		}
 	}
 }
+
+func (m *serialPort) ctlloop() {
+	select {
+	case  <-m.queue.Ctl:
+		log.Print("[DEBUG] SerialClient: ctlloop close")
+		break
+	}
+	m.Close()
+}
+
 
 func (m *serialPort) receiveloop() {
 	buffer := make([]byte, 1024)
@@ -105,7 +122,6 @@ func (m *serialPort) receiveloop() {
 
 			m.queue.Write <- Message{Id:m.config.Port, Body:b}
 		}
-
 		if err != nil {
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				log.Print("[DEBUG] SerialClient: EOF")
@@ -116,16 +132,18 @@ func (m *serialPort) receiveloop() {
 			}
 		}
 
-		if err == nil {
-			log.Print("[DEBUG] Serial  Null Read")
+		if  n == 0 && err == nil {
+			log.Print("[DEBUG] SerialClient: Null Read")
+			break
 		}
 
-		if m.state == STATE_CLOSED {
+		if m.portState == PORT_CLOSED {
 			break
 		}
 	}
 	log.Print("[DEBUG] SerialClient: Terminating Receiving loop")
-	m.queue.Ctl <- true
+	m.serialClose()
+	close(m.queue.Ctl)
 }
 
 func (m *serialPort) GetName() string {
@@ -142,16 +160,18 @@ func (m *serialPort) GetType() int {
 
 func (m *serialPort) Close() {
 	log.Print("[DEBUG] SerialClient: Closing")
-	m.state = STATE_CLOSED
-	close(m.queue.Ctl)
-	m.port.Close()
-
+	m.state = STATE_STOPPED
+	close(m.queue.Read)
+	close(m.queue.Write)
 }
 
 // Reads from a pair of downstream
 // and write to a serial Port
-// TODO provide the notion of command with a separator
+
 func (m *serialPort) Open()  error {
+	if m.state == STATE_STARTED {
+		panic("Serial: already started")
+	}
 	if m.queue == nil {
 		return fmt.Errorf("Need to create Add queue first")
 	}
@@ -159,9 +179,10 @@ func (m *serialPort) Open()  error {
 		log.Printf("[ERROR] SerialClient: Cannot open port: %s", err)
 		return err
 	}
-	m.state = STATE_OPEN
+	m.state = STATE_STARTED
 	go m.receiveloop()
 	go m.sendloop()
+	go m.ctlloop()
 
 	return nil
 }
@@ -175,6 +196,7 @@ func (m *serialPort) GetQueues() *QueuePair {
 }
 
 func getConfig(conf ModuleConfig) (SerialConfig, error) {
+	log.Printf("getConfig %v", conf)
 	c := SerialConfig{}
 	if port, ok := conf["port"]; ok {
 		c.Port = port
@@ -184,6 +206,20 @@ func getConfig(conf ModuleConfig) (SerialConfig, error) {
 			c.Baud = uint(v)
 		} else {
 			return c, fmt.Errorf("Invalid Baud value")
+		}
+	}
+	if db, ok := conf["data_bits"]; ok {
+		if v, err := strconv.Atoi(db); err == nil {
+			c.DataBits = uint(v)
+		} else {
+			return c, fmt.Errorf("Invalid data_bits value")
+		}
+	}
+	if sb, ok := conf["stop_bits"]; ok {
+		if v, err := strconv.Atoi(sb); err == nil {
+			c.StopBits = uint(v)
+		} else {
+			return c, fmt.Errorf("Invalid stop_bits value")
 		}
 	}
 	return c, nil
@@ -201,8 +237,8 @@ func NewSerial(conf ModuleConfig) (Module, error) {
 		panic(err)
 	}
 	out.uuid = id
-	out.state = STATE_CLOSED
-
+	out.state = STATE_STOPPED
+	out.portState = PORT_CLOSED
 	if c, err := getConfig( conf ); err != nil {
 		return nil, err
 	} else {

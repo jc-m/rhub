@@ -43,6 +43,8 @@ func (c *connection) receiveloop(){
 			log.Printf("[DEBUG] TCPServer: Sending %+v", b)
 			// needs to have the client address instead
 			c.server.queue.Write <- Message{Id:c.conn.RemoteAddr().String(), Body:b}
+		} else {
+			log.Printf("[DEBUG] TCPServer: 0 read")
 		}
 	}
 	log.Print("[DEBUG] TCPServer: Closing receiveloop")
@@ -57,13 +59,14 @@ func (c *connection) sendloop() {
 	for {
 		select {
 		case r := <-c.server.queue.Read:
+			// TODO server address does not have the right address
 			if r.Id == c.server.address {
-				n, err := c.conn.Write(r.Body)
-				if err != nil {
-					panic(err)
-				}
-				log.Printf("[DEBUG] TCPServer: Sent %d bytes", n)
 			}
+			n, err := c.conn.Write(r.Body)
+			if err != nil {
+				panic(err)
+			}
+			log.Printf("[DEBUG] TCPServer: Sent %d bytes", n)
 		case <-c.server.queue.Ctl:
 			log.Print("[DEBUG] TCPServer: Terminating Sending loop")
 			return
@@ -87,7 +90,10 @@ func (t *tcpServ) Close() {
 }
 
 func (t *tcpServ) Open()  error {
-
+	if t.state == STATE_STARTED {
+		panic("TCPServer: already started")
+	}
+	t.state = STATE_STARTED
 	go func(server *tcpServ) error {
 		log.Printf("[DEBUG] TCPServer: Listening on %s", server.address)
 
@@ -99,7 +105,11 @@ func (t *tcpServ) Open()  error {
 		server.listener = l
 
 		for {
-			conn, _ := l.Accept()
+			log.Print("[DEBUG] TCPServer: Accepting")
+			conn, err := l.Accept()
+			if err != nil {
+				log.Fatal(err)
+			}
 			client := &connection{
 				conn:   conn,
 				server: server,
@@ -108,6 +118,7 @@ func (t *tcpServ) Open()  error {
 			go client.sendloop()
 
 		}
+		return nil
 	}(t)
 
 	return nil
@@ -140,5 +151,6 @@ func NewTCPServ(conf ModuleConfig) (Module, error) {
 		address : conf["address"],
 		uuid: id,
 		queue: q,
+		state: STATE_STOPPED,
 	}, nil
 }

@@ -16,6 +16,7 @@ type cmdBuffer struct {
 	buffer *bytes.Buffer
 	name string
 	uuid string
+	state int
 }
 
 type BufferConfig struct {
@@ -100,6 +101,10 @@ func (r *cmdBuffer) upstreamLoop(pairId int) {
 
 func (r *cmdBuffer) Open()  error {
 	// create one command loop per channel pair
+	if r.state == STATE_STARTED {
+		panic("Pipe: Already started")
+	}
+	r.state = STATE_STARTED
 	go r.downstreamLoop()
 	return nil
 }
@@ -127,5 +132,6 @@ func NewCmdBuffer(conf ModuleConfig) (Module, error) {
 		queue: q,
 		config: c,
 		uuid: id,
+		state: STATE_STOPPED,
 	}, nil
 }

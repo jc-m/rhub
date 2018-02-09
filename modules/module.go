@@ -2,7 +2,6 @@ package modules
 
 import (
 	"fmt"
-	"log"
 )
 
 // DRIVER modules only have one pair of channels, and are communicating with the network or a device on the other side.
@@ -13,6 +12,11 @@ const (
 )
 const (
 	M_DATA = iota
+)
+
+const (
+	STATE_STOPPED = iota
+	STATE_STARTED
 )
 
 type Message struct {
@@ -51,7 +55,6 @@ func Register(name string, f InitFunc ) error {
 	if _, exists := ModuleMap[name]; exists {
 		panic("Module registered multiple time")
 	}
-	log.Printf("[DEBUG] Module : Registering %s", name)
 
 	ModuleMap[name] = f
 

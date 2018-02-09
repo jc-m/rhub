@@ -5,8 +5,12 @@ import (
 )
 
 func TestPTY(t *testing.T) {
+	c := make(map[string]string)
 
-	pty := NewPty()
+	pty, err := NewPty(c)
+	if err != nil {
+		t.Fatal(err)
+	}
 	q := pty.GetQueues()
 
 	if err:= pty.Open(); err != nil {

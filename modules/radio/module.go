@@ -16,6 +16,7 @@ type rig struct {
 	queue      *QueuePair
 	driver     rigs.Rig
 	uuid       string
+	state      int
 }
 
 
@@ -56,7 +57,10 @@ func (m *rig) upstreamLoop() {
 
 
 func (m *rig) Open()  error {
-
+	if m.state == STATE_STARTED {
+		panic("RadioModel: already started")
+	}
+	m.state = STATE_STARTED
 	go m.upstreamLoop()
 
 	return nil
@@ -108,5 +112,6 @@ func New(conf ModuleConfig) (Module, error) {
 		queue: q,
 		driver: ft991a.New(),
 		uuid: id,
+		state: STATE_STOPPED,
 	}, nil
 }

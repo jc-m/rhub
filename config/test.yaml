@@ -1,0 +1,16 @@
+streams:
+   - name : test
+     modules :
+       - name     : "pipe"
+         module   : "pipe"
+         config :
+           tap  : "false"
+       - name     : "pty"
+         module   : "pty"
+         upstream : "pipe"
+       - name     : "net"
+         module   : "tcp_server"
+         upstream : "pipe"
+         config  :
+            address : ":7375"
+

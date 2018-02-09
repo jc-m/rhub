@@ -7,6 +7,7 @@ import (
 	"syscall"
 	"os/signal"
 	"github.com/jc-m/rhub/config"
+	"github.com/jc-m/rhub/stream"
 )
 
 type Server struct {
@@ -35,6 +36,11 @@ func (s *Server) Run(ctx context.Context) error {
 	conf := config.GetConfig(s.params.ConfigPath)
 
 	log.Printf("%+v", conf)
+	for _, streamConfig := range conf.Streams {
+		if st := stream.NewStream(streamConfig); st != nil {
+			st.Start()
+		}
+	}
 
 	for {
 		select {

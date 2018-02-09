@@ -19,8 +19,9 @@ import (
 type pty struct {
 	queue      *QueuePair
 	portPair
-	state      byte
+	state      int
 	uuid       string
+	portState  int
 }
 
 type portPair struct {
@@ -152,16 +153,17 @@ func (p *pty) receiveloop() {
 
 			if err == nil {
 				log.Print("[DEBUG] Null Read")
-				p.state = STATE_CLOSED
+				break
 			}
 		}
-		if p.state == STATE_CLOSED {
+		if p.portState == PORT_CLOSED {
 			log.Printf("[DEBUG] Pty: Port is closed : %s", p.portName)
 			break
 		}
 	}
 	log.Print("[DEBUG] Pty: Terminating Receiving loop")
-	p.queue.Ctl <- true
+	p.ptyClose()
+	close(p.queue.Ctl)
 }
 
 
@@ -169,17 +171,33 @@ func (p *pty) sendloop() {
 	for {
 		select {
 		case r := <-p.queue.Read:
+			if p.portState == PORT_CLOSED {
+				return
+			}
 			n, err := syscall.Write(p.ptmx, r.Body)
 			if err != nil {
 				panic(err)
 			}
 			log.Printf("[DEBUG] Pty: Sent %d bytes", n)
-
-		case <-p.queue.Ctl:
-			log.Print("[DEBUG] Pty: Terminating Sending loop")
-			return
 		}
 	}
+}
+
+func (p *pty) ctlloop() {
+	select {
+	case <-p.queue.Ctl:
+		log.Print("[DEBUG] Pty: ctlloop close")
+		break
+	}
+	p.Close()
+}
+
+func (p *pty) ptyClose() {
+	p.portState = PORT_CLOSED
+
+	syscall.Close(p.slave)
+	syscall.Close(p.ptmx)
+
 }
 
 func (p *pty) ptyOpen() error {
@@ -187,16 +205,16 @@ func (p *pty) ptyOpen() error {
 	if err != nil {
 		return err
 	}
+	p.portState = PORT_OPEN
 	p.portPair = *pt
-	p.state = STATE_OPEN
 	return nil
 }
 
 func (p *pty) Close() {
 	log.Print("[DEBUG] Pty: Closing")
-	close(p.queue.Ctl)
-	syscall.Close(p.slave)
-	syscall.Close(p.ptmx)
+
+	close(p.queue.Read)
+	close(p.queue.Write)
 
 }
 
@@ -223,14 +241,17 @@ func (p *pty) GetQueues() *QueuePair {
 // Reads from a pair of downstream
 // and write to a serial Port
 func (p *pty) Open()  error {
-
+	if p.state == STATE_STARTED {
+		panic("Pty: already started")
+	}
 	if err := p.ptyOpen(); err != nil {
-		log.Printf("[ERROR] Pty: Cannot open port: %s", err)
 		return err
 	}
+	p.state = STATE_STARTED
 
 	go p.receiveloop()
 	go p.sendloop()
+	go p.ctlloop()
 
 	return nil
 }
@@ -249,5 +270,7 @@ func NewPty(conf ModuleConfig) (Module, error) {
 	return &pty {
 		queue: q,
 		uuid: id,
+		state: STATE_STOPPED,
+		portState: PORT_CLOSED,
 	}, nil
 }

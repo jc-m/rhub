@@ -15,8 +15,7 @@ streams:
       module   : serial
       upstream : pipe
       config:
-         port  : 7375
-         bind  : 0.0.0.0/0
+         address  : ":7375"
 `
 func TestYaml(t *testing.T) {
 
@@ -35,7 +34,7 @@ func TestYaml(t *testing.T) {
 	if len(v.Streams[0].Modules) != 2 {
 		t.Errorf("Unexpected value")
 	}
-	if v.Streams[0].Modules[1].Config["port"] != "7375" {
+	if v.Streams[0].Modules[1].Config["address"] != ":7375" {
 		t.Errorf("Unexpected value")
 	}
 }

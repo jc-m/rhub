@@ -6,7 +6,7 @@
 	url = https://github.com/tarm/serial
 [submodule "vendor/github.com/jacobsa/go-serial"]
 	path = vendor/github.com/jacobsa/go-serial
-	url = https://github.com/jacobsa/go-serial
+	url = https://github.com/jc-m/go-serial
 [submodule "vendor/github.com/spf13/pflag"]
 	path = vendor/github.com/spf13/pflag
 	url = https://github.com/spf13/pflag

@@ -90,6 +90,7 @@ func NewStream(conf config.Stream) *Stream {
 
 	for _, m := range conf.Modules {
 		if mod, err  := modules.GetModule(m.Module, m.Config); err == nil {
+			log.Printf("%+v", mod)
 			s.AddNode(m.Name, mod)
 		} else {
 			log.Print(err)
@@ -156,6 +157,7 @@ func (s *Stream) startNode(node *Node) error {
 		return err
 	}
 	for _, n := range s.vertices[node.Id] {
+
 		s.startNode(s.Index[n])
 	}
 	return nil

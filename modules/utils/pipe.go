@@ -16,6 +16,7 @@ type pipeModule struct {
 	connected []*QueuePair
 	buffer *bytes.Buffer
 	uuid string
+	state int
 }
 
 type PipeConfig struct {
@@ -75,6 +76,10 @@ func (r *pipeModule) pipeLoop() {
 
 func (r *pipeModule) Open()  error {
 	// create one command loop per channel pair
+	if r.state == STATE_STARTED {
+		panic("Pipe: Already started")
+	}
+	r.state = STATE_STARTED
 	go r.pipeLoop()
 	return nil
 }
@@ -99,6 +104,7 @@ func getConfig(conf ModuleConfig) (PipeConfig, error) {
 
 func NewPipe(conf ModuleConfig) (Module, error) {
 	out := &pipeModule{
+		state: STATE_STOPPED,
 		buffer: bytes.NewBuffer([]byte{}),
 	}
 	out.queue = &QueuePair{

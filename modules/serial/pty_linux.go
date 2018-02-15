@@ -1,9 +1,9 @@
 package serial
 
 import (
-	"strconv"
 	"syscall"
 	"unsafe"
+	"fmt"
 )
 
 func grantpt(fd uintptr) error {
@@ -11,16 +11,16 @@ func grantpt(fd uintptr) error {
 }
 
 func unlockpt(fd uintptr) error {
-	var u _C_int
+	var u uintptr
 	// use TIOCSPTLCK with a zero valued arg to clear the slave pty lock
 	return ioctl(fd, syscall.TIOCSPTLCK, uintptr(unsafe.Pointer(&u)))
 }
 
 func ptsname(fd int) (string, error) {
-	var n _C_uint
+	var n uintptr
 	err := ioctl(uintptr(fd), syscall.TIOCGPTN, uintptr(unsafe.Pointer(&n)))
 	if err != nil {
 		return "", err
 	}
-	return "/dev/pts/" + strconv.Itoa(int(n)), nil
+	return fmt.Sprintf("/dev/pts/%d", n), nil
 }

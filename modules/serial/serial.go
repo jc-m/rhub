@@ -1,7 +1,6 @@
 package serial
 
 import (
-	"github.com/jacobsa/go-serial/serial"
 	"log"
 	"io"
 	. "github.com/jc-m/rhub/modules"
@@ -14,10 +13,11 @@ import (
 
 type SerialConfig struct {
 	Port string
-	Baud uint
+	Baud int
 	Parity uint
 	DataBits uint
-	StopBits uint
+	StopBits int
+	RtsCts bool
 }
 
 type serialPort struct {
@@ -29,40 +29,20 @@ type serialPort struct {
 	portState  int
 }
 
+
 func init() {
 	Register("serial", NewSerial)
 }
 
-func (m *serialPort) serialOpen() error {
-	var parity serial.ParityMode
-	c := m.config
+func (m *serialPort) portOpen() error {
 
-	switch c.Parity {
-	case PARITY_EVEN:
-		parity = serial.PARITY_EVEN
-	case PARITY_ODD:
-		parity = serial.PARITY_ODD
-	case PARITY_NONE:
-		parity = serial.PARITY_NONE
-	default:
-		parity = serial.PARITY_NONE
+	port, err := openInternal(m.config)
+	log.Printf("[DEBUG] SerialClient: %+v", err)
+
+	if err != nil {
+		return err
 	}
-
-
-	conf := serial.OpenOptions{
-		PortName: c.Port,
-		BaudRate:c.Baud,
-		ParityMode:parity,
-		StopBits:c.StopBits,
-		DataBits:c.DataBits,
-		MinimumReadSize: 1,
-		}
-
-		port, err := serial.Open(conf)
-		if err != nil {
-			return err
-		}
-		m.port = port
+	m.port = port
 	m.portState = PORT_OPEN
 	return nil
 }
@@ -90,7 +70,7 @@ func (m *serialPort) sendloop() {
 				log.Print("[DEBUG] SerialClient: closing send loop")
 				return
 			}
-			log.Print("[DEBUG] SerialClient: Writing ...")
+			log.Print("[DEBUG] SerialClient: Writing %s", string(r.Body))
 
 			m.serialWrite(r.Body)
 		}
@@ -111,6 +91,7 @@ func (m *serialPort) receiveloop() {
 	buffer := make([]byte, 1024)
 	for {
 		log.Print("[DEBUG] SerialClient: Reading")
+		log.Print("[DEBUG] SerialClient: values %+v", m.port)
 
 		n, err := m.port.Read(buffer)
 		log.Printf("[DEBUG] SerialClient: Received %d bytes", n)
@@ -118,7 +99,7 @@ func (m *serialPort) receiveloop() {
 		if n > 0 {
 			b := make([]byte, n)
 			copy(b, buffer[:n])
-			log.Printf("[DEBUG] SerialClient: Sending %+v", b)
+			log.Printf("[DEBUG] SerialClient: Received %s", string(b))
 
 			m.queue.Write <- Message{Id:m.config.Port, Body:b}
 		}
@@ -175,7 +156,7 @@ func (m *serialPort) Open()  error {
 	if m.queue == nil {
 		return fmt.Errorf("Need to create Add queue first")
 	}
-	if err := m.serialOpen(); err != nil {
+	if err := m.portOpen(); err != nil {
 		log.Printf("[ERROR] SerialClient: Cannot open port: %s", err)
 		return err
 	}
@@ -203,7 +184,7 @@ func getConfig(conf ModuleConfig) (SerialConfig, error) {
 	}
 	if baud, ok := conf["baud"]; ok {
 		if v, err := strconv.Atoi(baud); err == nil {
-			c.Baud = uint(v)
+			c.Baud = v
 		} else {
 			return c, fmt.Errorf("Invalid Baud value")
 		}
@@ -217,11 +198,22 @@ func getConfig(conf ModuleConfig) (SerialConfig, error) {
 	}
 	if sb, ok := conf["stop_bits"]; ok {
 		if v, err := strconv.Atoi(sb); err == nil {
-			c.StopBits = uint(v)
+			c.StopBits = v
 		} else {
 			return c, fmt.Errorf("Invalid stop_bits value")
 		}
 	}
+	if tap, ok := conf["rst_cts"]; ok {
+		switch tap{
+		case "true":
+			c.RtsCts = true
+		case "false":
+			c.RtsCts = true
+		default:
+			return c, fmt.Errorf("invalid rts_cts value")
+		}
+	}
+
 	return c, nil
 }
 func NewSerial(conf ModuleConfig) (Module, error) {

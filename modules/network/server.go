@@ -14,6 +14,7 @@ type tcpServ struct {
 	listener net.Listener
 	state byte
 	uuid string
+	connected bool
 }
 
 type connection struct {
@@ -40,9 +41,9 @@ func (c *connection) receiveloop(){
 			b := make([]byte, n)
 			copy(b, buffer[:n])
 
-			log.Printf("[DEBUG] TCPServer: Sending %+v", b)
-			// needs to have the client address instead
+			log.Printf("[DEBUG] TCPServer: Received %s", string(b))
 			c.server.queue.Write <- Message{Id:c.conn.RemoteAddr().String(), Body:b}
+
 		} else {
 			log.Printf("[DEBUG] TCPServer: 0 read")
 		}
@@ -50,7 +51,7 @@ func (c *connection) receiveloop(){
 	log.Print("[DEBUG] TCPServer: Closing receiveloop")
 
 	c.conn.Close()
-	c.server.queue.Ctl <- true
+	c.server.connected = false
 }
 
 func (c *connection) sendloop() {
@@ -95,6 +96,7 @@ func (t *tcpServ) Open()  error {
 	}
 	t.state = STATE_STARTED
 	go func(server *tcpServ) error {
+
 		log.Printf("[DEBUG] TCPServer: Listening on %s", server.address)
 
 		l, err := net.Listen("tcp", server.address)
@@ -110,13 +112,18 @@ func (t *tcpServ) Open()  error {
 			if err != nil {
 				log.Fatal(err)
 			}
+			if t.connected {
+				log.Print("[DEBUG] TCPServer: Already connected")
+				conn.Close()
+				continue
+			}
 			client := &connection{
 				conn:   conn,
 				server: server,
 			}
 			go client.receiveloop()
 			go client.sendloop()
-
+			t.connected = true
 		}
 		return nil
 	}(t)
@@ -152,5 +159,6 @@ func NewTCPServ(conf ModuleConfig) (Module, error) {
 		uuid: id,
 		queue: q,
 		state: STATE_STOPPED,
+		connected: false,
 	}, nil
 }

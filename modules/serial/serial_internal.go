@@ -6,15 +6,9 @@ import (
 	"syscall"
 	"log"
 	"errors"
+	"golang.org/x/sys/unix"
 )
 
-const (
-	TCSANOW   = 0
-	TCSADRAIN = 1
-	TCSAFLUSH = 2
-)
-
-type termStatus syscall.Termios
 
 type Port struct{
 	fd int
@@ -38,12 +32,11 @@ func (p Port) Flush() {
 }
 
 func openInternal(options SerialConfig) (io.ReadWriteCloser, error) {
-	var status termStatus
 
 	log.Printf("[DEBUG] Serial: Openning %s", options.Port)
 
 	// Open will block without the O_NONBLOCK
-	port, err := syscall.Open(options.Port, syscall.O_RDWR|syscall.O_NOCTTY|syscall.O_CLOEXEC|syscall.O_NONBLOCK, 0620)
+	port, err := syscall.Open(options.Port, syscall.O_RDWR|syscall.O_NOCTTY|syscall.O_NONBLOCK, 0600)
 	if err != nil {
 		return nil, err
 	}
@@ -54,50 +47,53 @@ func openInternal(options SerialConfig) (io.ReadWriteCloser, error) {
 	Tcflush(fd, syscall.TCIFLUSH)
 
 
-	err = Tcgetattr(fd, &status)
-	if err != nil {
+	status, geterr := unix.IoctlGetTermios(port, ioctlReadTermios)
+	if geterr != nil {
 		syscall.Close(port)
 		return nil, err
 	}
 
-	status.Cflag = syscall.CS8 | syscall.CREAD | syscall.CLOCAL
-	status.Cflag &^= syscall.CSIZE | syscall.PARENB
-	status.Cflag |= syscall.CLOCAL | syscall.CREAD | syscall.CS8
+	log.Printf("[DEBUG] Serial: Status %+v", status)
 
+
+	status.Cflag = unix.CSIZE | unix.PARENB | unix.CLOCAL | unix.CREAD | unix.CS8
 
 
 	switch options.StopBits {
 	case 1:
-		status.Cflag &^= syscall.CSTOPB
+		status.Cflag &^= unix.CSTOPB
 	case 2:
-		status.Cflag |= syscall.CSTOPB
+		status.Cflag |= unix.CSTOPB
 	default:
 		return nil, errors.New("Unknown StopBits value")
 	}
 
 	// raw input
-	status.Cflag &^= syscall.ICANON | syscall.ECHO | syscall.ECHOE | syscall.ISIG
+	status.Lflag &^= unix.ICANON | unix.ECHO | unix.ECHOE | unix.ISIG | unix.IEXTEN
 
 	// raw output
-	status.Oflag &^= syscall.OPOST
+	status.Oflag &^= unix.OPOST
 	// software flow control disabled
-	status.Iflag &^= syscall.IXON
+	status.Iflag &^= unix.IXON
 	// do not translate CR to NL
-	status.Iflag &^= syscall.ICRNL
+	status.Iflag &^= unix.ICRNL
+
 
 	if options.RtsCts {
-		status.Cflag &= CRTSCTS
+		status.Cflag |= unix.CRTSCTS
 	} else {
-		status.Cflag &^= CRTSCTS
+		status.Cflag &^= unix.CRTSCTS
 	}
+	log.Printf("[DEBUG] Serial: New Status %+v", status)
 
-	status.setSpeed(options.Baud)
+	setSpeed(status, options.Baud)
 
-	err = Tcsetattr(fd, TCSANOW, &status)
-	if err != nil {
-		syscall.Close(port)
-		return nil, err
-	}
+	status.Cc[unix.VMIN] = 1
+	status.Cc[unix.VTIME] = 0
+
+	log.Printf("[DEBUG] Serial: Applying new status %+v", status)
+
+	unix.IoctlSetTermios(port, ioctlWriteTermios, status)
 
 	// Need to change back the port to blocking.
 
@@ -107,6 +103,7 @@ func openInternal(options SerialConfig) (io.ReadWriteCloser, error) {
 		return nil, nonblockErr
 	}
 
+
 	// clear the DTR bit
 	flag := syscall.TIOCM_DTR
 
@@ -114,6 +111,10 @@ func openInternal(options SerialConfig) (io.ReadWriteCloser, error) {
 
 
 	Tcflush(fd, syscall.TCIFLUSH)
+
+	status, _ = unix.IoctlGetTermios(port, ioctlReadTermios)
+
+	log.Printf("[DEBUG] Serial: Read back Status %+v", status)
 
 	p := &Port{
 		fd: port,

@@ -3,15 +3,16 @@ package serial
 import (
 	"syscall"
 	"unsafe"
+	"golang.org/x/sys/unix"
 )
 
 const (
+	ioctlReadTermios = unix.TCGETS
+    ioctlWriteTermios = unix.TCSETS
+)
 
-	TCSETS  = 0x5402
-	TCSETSW = 0x5403
-	TCSETSF = 0x5404
+const (
 	TCFLSH  = 0x540B
-
 
 	CCTS_OFLOW = 0x00010000
 	CRTS_IFLOW = 0x00020000
@@ -23,33 +24,12 @@ func Tcflush(fd, which uintptr) error {
 	return ioctl(fd, TCFLSH, which)
 }
 
-// Tcgetattr gets the current serial port settings.
-func Tcgetattr(fd uintptr, argp *termStatus) error {
-	return ioctl(fd, syscall.TCGETS, uintptr(unsafe.Pointer(argp)))
-}
-
 // Tiocmbic clears the indicated modem bits.
 func Tiocmbic(fd uintptr, status *int) error {
 	return ioctl(fd, syscall.TIOCMBIC, uintptr(unsafe.Pointer(status)))
 }
 
-// Tcsetattr sets the current serial port settings.
-func Tcsetattr(fd, opt uintptr, argp *termStatus) error {
-	var request uintptr
-	switch opt {
-	case TCSANOW:
-		request = TCSETS
-	case TCSADRAIN:
-		request = TCSETSW
-	case TCSAFLUSH:
-		request = TCSETSF
-	default:
-		return syscall.EINVAL
-	}
-	return ioctl(fd, request, uintptr(unsafe.Pointer(argp)))
-}
-
-func (s *termStatus) setSpeed(baud int) error {
+func setSpeed(s *unix.Termios, baud int) error {
 	var rate uint32
 
 	switch baud {
@@ -116,8 +96,8 @@ func (s *termStatus) setSpeed(baud int) error {
 	default:
 		return syscall.EINVAL
 	}
-	(*syscall.Termios)(s).Cflag &= rate
-	(*syscall.Termios)(s).Ispeed = rate
-	(*syscall.Termios)(s).Ospeed = rate
+	s.Cflag &= rate
+	s.Ispeed = rate
+	s.Ospeed = rate
 	return nil
 }

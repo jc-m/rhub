@@ -11,10 +11,10 @@ import (
 func TestSerial(t *testing.T) {
 
 	c := make(map[string]string)
-	c["port"] = "/dev/ttys005"
+	c["port"] = "/dev/tty.SLAB_USBtoUART"
 	c["baud"] = "38400"
-	c["data_bits"] = "8"
-	c["stop_bits"] = "1"
+	c["stop_bits"] = "2"
+	c["rts_cts"] = "true"
 
 	client, err := NewSerial(c)
 	if err != nil {
@@ -27,7 +27,7 @@ func TestSerial(t *testing.T) {
 	}
 
 	var buffer bytes.Buffer
-	buffer.Write([]byte("Test"))
+	buffer.Write([]byte("PS1;"))
 	channels.Read <- modules.Message{ Id:"test", Body:buffer.Bytes()}
 
 	for {

@@ -1,9 +1,14 @@
+// +build darwin dragonfly freebsd netbsd openbsd
 package serial
 
 import (
 	"syscall"
 	"unsafe"
+	"golang.org/x/sys/unix"
 )
+
+const ioctlReadTermios = unix.TIOCGETA
+const ioctlWriteTermios = unix.TIOCSETA
 
 const (
 	FREAD  = 0x0001
@@ -29,32 +34,12 @@ func Tcflush(fd, which uintptr) error {
 	return ioctl(fd, syscall.TIOCFLUSH, uintptr(unsafe.Pointer(&com)))
 }
 
-// Tcgetattr gets the current serial port settings.
-func Tcgetattr(fd uintptr, argp *termStatus) error {
-	return ioctl(fd, syscall.TIOCGETA, uintptr(unsafe.Pointer(argp)))
-}
-
 // Tiocmbic clears the indicated modem bits.
 func Tiocmbic(fd uintptr, status *int) error {
 	return ioctl(fd, syscall.TIOCMBIC, uintptr(unsafe.Pointer(status)))
 }
 
-// Tcsetattr sets the current serial port settings.
-func Tcsetattr(fd, opt uintptr, argp *termStatus) error {
-	switch opt {
-	case TCSANOW:
-		opt = syscall.TIOCSETA
-	case TCSADRAIN:
-		opt = syscall.TIOCSETAW
-	case TCSAFLUSH:
-		opt = syscall.TIOCSETAF
-	default:
-		return syscall.EINVAL
-	}
-	return ioctl(fd, opt, uintptr(unsafe.Pointer(argp)))
-}
-
-func (s *termStatus) setSpeed(baud int) error {
+func setSpeed(s *unix.Termios, baud int) error {
 	var rate uint64
 
 	switch baud {
@@ -97,8 +82,8 @@ func (s *termStatus) setSpeed(baud int) error {
 	default:
 		return syscall.EINVAL
 	}
-	(*syscall.Termios)(s).Cflag &= rate
-	(*syscall.Termios)(s).Ispeed = rate
-	(*syscall.Termios)(s).Ospeed = rate
+	s.Cflag &= rate
+	s.Ispeed = rate
+	s.Ospeed = rate
 	return nil
 }

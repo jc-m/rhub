@@ -37,7 +37,6 @@ func init() {
 func (m *serialPort) portOpen() error {
 
 	port, err := openInternal(m.config)
-	log.Printf("[DEBUG] SerialClient: %+v", err)
 
 	if err != nil {
 		return err
@@ -70,7 +69,7 @@ func (m *serialPort) sendloop() {
 				log.Print("[DEBUG] SerialClient: closing send loop")
 				return
 			}
-			log.Print("[DEBUG] SerialClient: Writing %s", string(r.Body))
+			log.Printf("[DEBUG] SerialClient: Writing %s", string(r.Body))
 
 			m.serialWrite(r.Body)
 		}
@@ -91,7 +90,6 @@ func (m *serialPort) receiveloop() {
 	buffer := make([]byte, 1024)
 	for {
 		log.Print("[DEBUG] SerialClient: Reading")
-		log.Print("[DEBUG] SerialClient: values %+v", m.port)
 
 		n, err := m.port.Read(buffer)
 		log.Printf("[DEBUG] SerialClient: Received %d bytes", n)
@@ -189,13 +187,6 @@ func getConfig(conf ModuleConfig) (SerialConfig, error) {
 			return c, fmt.Errorf("Invalid Baud value")
 		}
 	}
-	if db, ok := conf["data_bits"]; ok {
-		if v, err := strconv.Atoi(db); err == nil {
-			c.DataBits = uint(v)
-		} else {
-			return c, fmt.Errorf("Invalid data_bits value")
-		}
-	}
 	if sb, ok := conf["stop_bits"]; ok {
 		if v, err := strconv.Atoi(sb); err == nil {
 			c.StopBits = v
@@ -203,7 +194,7 @@ func getConfig(conf ModuleConfig) (SerialConfig, error) {
 			return c, fmt.Errorf("Invalid stop_bits value")
 		}
 	}
-	if tap, ok := conf["rst_cts"]; ok {
+	if tap, ok := conf["rts_cts"]; ok {
 		switch tap{
 		case "true":
 			c.RtsCts = true

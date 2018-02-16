@@ -13,3 +13,6 @@
 [submodule "vendor/github.com/peterh/liner"]
 	path = vendor/github.com/peterh/liner
 	url = https://github.com/peterh/liner
+[submodule "vendor/golang.org/x/sys"]
+	path = vendor/golang.org/x/sys
+	url = https://github.com/golang/sys.git

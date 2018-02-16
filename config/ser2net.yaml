@@ -14,7 +14,7 @@ streams:
             parity : "N"
             data_bits   : "8"
             stop_bits   : "1"
-            rts_cts     : "true"
+            rts_cts     : "false"
        - name     : "net"
          module   : "tcp_server"
          upstream : "pipe"

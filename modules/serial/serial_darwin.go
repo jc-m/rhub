@@ -34,10 +34,6 @@ func Tcflush(fd, which uintptr) error {
 	return ioctl(fd, syscall.TIOCFLUSH, uintptr(unsafe.Pointer(&com)))
 }
 
-// Tiocmbic clears the indicated modem bits.
-func Tiocmbic(fd uintptr, status *int) error {
-	return ioctl(fd, syscall.TIOCMBIC, uintptr(unsafe.Pointer(status)))
-}
 
 func setSpeed(s *unix.Termios, baud int) error {
 	var rate uint64
@@ -82,7 +78,7 @@ func setSpeed(s *unix.Termios, baud int) error {
 	default:
 		return syscall.EINVAL
 	}
-	s.Cflag &= rate
+	s.Cflag |= rate
 	s.Ispeed = rate
 	s.Ospeed = rate
 	return nil

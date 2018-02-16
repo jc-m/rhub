@@ -7,6 +7,7 @@ import (
 	"log"
 	"errors"
 	"golang.org/x/sys/unix"
+	"unsafe"
 )
 
 
@@ -30,6 +31,20 @@ func (p Port) Flush() {
 	fd := uintptr(p.fd)
 	Tcflush(fd, syscall.TCIFLUSH)
 }
+
+func setRts(fd uintptr,b  bool) error {
+	state := syscall.TIOCM_RTS
+	if err := ioctl(fd, syscall.TIOCMGET, uintptr(unsafe.Pointer(&state))); err != nil {
+		return err
+	}
+	if b {
+		state |= syscall.TIOCM_RTS
+	} else {
+		state &^= syscall.TIOCM_RTS
+	}
+	return ioctl(fd, syscall.TIOCMSET, uintptr(unsafe.Pointer(&state)))
+}
+
 
 func openInternal(options SerialConfig) (io.ReadWriteCloser, error) {
 
@@ -56,8 +71,8 @@ func openInternal(options SerialConfig) (io.ReadWriteCloser, error) {
 	log.Printf("[DEBUG] Serial: Status %+v", status)
 
 
-	status.Cflag = unix.CSIZE | unix.PARENB | unix.CLOCAL | unix.CREAD | unix.CS8
-
+	status.Cflag = unix.CSIZE  | unix.CLOCAL | unix.CREAD | unix.CS8
+	status.Cflag &^= unix.PARENB
 
 	switch options.StopBits {
 	case 1:
@@ -103,12 +118,7 @@ func openInternal(options SerialConfig) (io.ReadWriteCloser, error) {
 		return nil, nonblockErr
 	}
 
-
-	// clear the DTR bit
-	flag := syscall.TIOCM_DTR
-
-	Tiocmbic(fd, &flag)
-
+	//setRts(fd, true)
 
 	Tcflush(fd, syscall.TCIFLUSH)
 

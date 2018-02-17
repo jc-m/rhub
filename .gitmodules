@@ -16,3 +16,12 @@
 [submodule "vendor/golang.org/x/sys"]
 	path = vendor/golang.org/x/sys
 	url = https://github.com/golang/sys.git
+[submodule "vendor/github.com/divan/gorilla-xmlrpc"]
+	path = vendor/github.com/divan/gorilla-xmlrpc
+	url = https://github.com/divan/gorilla-xmlrpc.git
+[submodule "vendor/github.com/gorilla/rpc"]
+	path = vendor/github.com/gorilla/rpc
+	url = https://github.com/gorilla/rpc.git
+[submodule "vendor/github.com/rogpeppe/go-charset"]
+	path = vendor/github.com/rogpeppe/go-charset
+	url = https://github.com/rogpeppe/go-charset.git

@@ -20,6 +20,25 @@ func (h *FldigiService) FLGetName(r *http.Request, args *struct{}, reply *struct
 <?xml.version='1.0'?>
 <methodCall>
 	<methodName>main.get_trx_status</methodName>
+    <params><param><value><base64></base64></value></param></params>
+</methodCall>
+
+<?xml.version="1.0"?>
+<methodResponse>
+	<params><param><value><string>rx<string></value></param></params>
+</methodResponse>
+*/
+// RUMLOG is sending an empty string, but is should not
+func (h *FldigiService) GetTrxStatusRL(r *http.Request, args *struct{X string}, reply *struct{Status string}) error {
+	log.Print("[DEBUG] RPCServer:GetTrxStatusRL")
+	reply.Status = "tx"
+	return nil
+}
+
+/*
+<?xml.version='1.0'?>
+<methodCall>
+	<methodName>main.get_trx_status</methodName>
     <params></params>
 </methodCall>
 
@@ -82,7 +101,7 @@ func newRPCServer() *rpc.Server {
 	r.RegisterService(new(FldigiService), "")
 
 
-	xmlrpcCodec.RegisterAlias("main.get_trx_status", "FldigiService.GetTrxStatus")
+	xmlrpcCodec.RegisterAlias("main.get_trx_status", "FldigiService.GetTrxStatusRL")
 	xmlrpcCodec.RegisterAlias("tx.get_data", "FldigiService.TxGetData")
 	xmlrpcCodec.RegisterAlias("rig.get_frequency", "FldigiService.RigGetFreq")
 	xmlrpcCodec.RegisterAlias("fldigi.name", "FldigiService.FLGetName")

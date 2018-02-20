@@ -15,7 +15,11 @@ func TestRadio(t *testing.T) {
 	ctl := make(chan bool)
 
 
-	r := New()
+	r, err := New(modules.ModuleConfig{})
+	if err != nil {
+		t.Fatal(err)
+
+	}
 	q := r.GetQueues()
 
 	r.ConnectQueuePair(&modules.QueuePair{Read: upstreamWR, Write: upstreamRD, Ctl:ctl})
@@ -38,5 +42,4 @@ func TestRadio(t *testing.T) {
 	} else {
 		t.Fatalf("Missing value %s", "VFOA")
 	}
-
 }

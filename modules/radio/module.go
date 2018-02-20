@@ -38,14 +38,14 @@ func (m *rig) upstreamLoop() {
 	for {
 		select {
 		case buff := <-m.connected.Read:
-			if resp, err := m.driver.OnCatUpStream(string(buff.Body)); err == nil {
+			if resp, err := m.driver.OnCat(string(buff.Body), rigs.CAT_DIR_UP); err == nil {
 				if buff, err := getBytes(resp); err == nil {
 					m.queue.Write <- Message{Body:buff}
 				} else {
 					log.Print("[DEBUG] FT991A: Error Encoding message")
 				}
 			} else{
-				log.Printf("[DEBUG] FT991A: Error processing message: %s", string(buff.Body))
+				log.Printf("[DEBUG] FT991A: Error processing message: %s", err)
 			}
 			log.Printf("[DEBUG] RadioModel: Sent command: %s", string(buff.Body))
 		case <-m.connected.Ctl:

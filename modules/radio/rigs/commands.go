@@ -1,6 +1,11 @@
 package rigs
 
 const (
+	CAT_DIR_UP = iota
+	CAT_DIR_DOWN
+)
+
+const (
 	RIG_GET = "GET"
 	RIG_SET = "SET"
 	RIG_RSP = "RSP"

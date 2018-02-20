@@ -7,7 +7,10 @@ import (
 	"log"
 	"github.com/hashicorp/go-uuid"
 )
-
+const (
+	CNX_OPEN = iota
+	CNX_CLOSE
+)
 type tcpServ struct {
 	queue   *QueuePair
 	address string
@@ -20,6 +23,7 @@ type tcpServ struct {
 type connection struct {
 	conn net.Conn
 	server *tcpServ
+	state int
 }
 
 func init() {
@@ -32,6 +36,9 @@ func (c *connection) receiveloop(){
 	log.Print("[DEBUG] TCPServer: Starting Receive loop")
 
 	for {
+		if c.state == CNX_CLOSE {
+			break
+		}
 		n, err := c.conn.Read(buffer)
 		if err != nil {
 			log.Printf("[DEBUG] TCPServer: Error %+v", err)
@@ -50,8 +57,11 @@ func (c *connection) receiveloop(){
 	}
 	log.Print("[DEBUG] TCPServer: Closing receiveloop")
 
-	c.conn.Close()
-	c.server.connected = false
+	if c.state == CNX_OPEN {
+		c.state = CNX_CLOSE
+		c.conn.Close()
+		c.server.connected = false
+	}
 }
 
 func (c *connection) sendloop() {
@@ -63,6 +73,9 @@ func (c *connection) sendloop() {
 			// TODO server address does not have the right address
 			if r.Id == c.server.address {
 			}
+			if c.state == CNX_CLOSE {
+				goto close
+			}
 			n, err := c.conn.Write(r.Body)
 			if err != nil {
 				panic(err)
@@ -72,6 +85,12 @@ func (c *connection) sendloop() {
 			log.Print("[DEBUG] TCPServer: Terminating Sending loop")
 			return
 		}
+	}
+close:
+	if c.state == CNX_OPEN {
+		c.state = CNX_CLOSE
+		c.conn.Close()
+		c.server.connected = false
 	}
 }
 func (t *tcpServ) GetType() int {

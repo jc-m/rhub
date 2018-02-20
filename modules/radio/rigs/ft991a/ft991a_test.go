@@ -3,11 +3,12 @@ package ft991a
 import (
 	"testing"
 	"fmt"
+	"github.com/jc-m/rhub/modules/radio/rigs"
 )
 
 func TestAIRsp(t *testing.T) {
 
-	x, err := IFRsp("IF001007070000+1000C00000000;")
+	x, err := IF("IF001007070000+1000C00000000;", rigs.CAT_DIR_DOWN)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -15,7 +16,7 @@ func TestAIRsp(t *testing.T) {
 }
 
 func TestMDRsp(t *testing.T) {
-	x, err := MDRsp("0D")
+	x, err := MD("0D", rigs.CAT_DIR_DOWN)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +25,7 @@ func TestMDRsp(t *testing.T) {
 }
 
 func TestRMRsp(t *testing.T) {
-	x, err := RMRsp("6023")
+	x, err := RM("6023", rigs.CAT_DIR_DOWN)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +34,7 @@ func TestRMRsp(t *testing.T) {
 }
 
 func TestPCRsp(t *testing.T) {
-	x, err := PCRsp("005")
+	x, err := PC("005", rigs.CAT_DIR_DOWN)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +43,7 @@ func TestPCRsp(t *testing.T) {
 }
 
 func TestNLRsp(t *testing.T) {
-	x, err := NLRsp("0010")
+	x, err := NL("0010", rigs.CAT_DIR_DOWN)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +52,7 @@ func TestNLRsp(t *testing.T) {
 }
 
 func TestRLRsp(t *testing.T) {
-	x, err := RLRsp("006")
+	x, err := RL("006", rigs.CAT_DIR_DOWN)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -53,7 +53,11 @@ func (h *FldigiService) GetTrxStatus(r *http.Request, args *struct{}, reply *str
 	reply.Status = "tx"
 	return nil
 }
-
+func (h *FldigiService) GetFrequency(r *http.Request, args *struct{}, reply *struct{Freq float64}) error {
+	log.Print("[DEBUG] RPCServer: GetFrequency")
+	reply.Freq = 14072000.000000
+	return nil
+}
 /*
 <?xml.version='1.0'?>
 <methodCall>
@@ -93,6 +97,19 @@ func (h *FldigiService) RigGetFreq(r *http.Request, args *struct{}, reply *struc
 	return nil
 }
 
+func (h *FldigiService) RigSetFreq(r *http.Request, args *struct{Freq float64}, reply *struct{Freq float64}) error {
+	log.Print("[DEBUG] RPCServer: RigSetFreq")
+	reply.Freq = args.Freq
+	return nil
+}
+
+func (h *FldigiService) RigGetMode(r *http.Request, args *struct{}, reply *struct{Mode string}) error {
+	log.Print("[DEBUG] RPCServer: RigGetMode")
+	reply.Mode = "LSB"
+	return nil
+}
+
+
 
 func newRPCServer() *rpc.Server {
 	r := rpc.NewServer()
@@ -101,10 +118,14 @@ func newRPCServer() *rpc.Server {
 	r.RegisterService(new(FldigiService), "")
 
 
-	xmlrpcCodec.RegisterAlias("main.get_trx_status", "FldigiService.GetTrxStatusRL")
+	xmlrpcCodec.RegisterAlias("main.get_trx_status", "FldigiService.GetTrxStatus")
+	xmlrpcCodec.RegisterAlias("main.get_frequency", "FldigiService.GetFrequency")
+
 	xmlrpcCodec.RegisterAlias("tx.get_data", "FldigiService.TxGetData")
-	xmlrpcCodec.RegisterAlias("rig.get_frequency", "FldigiService.RigGetFreq")
 	xmlrpcCodec.RegisterAlias("fldigi.name", "FldigiService.FLGetName")
+	xmlrpcCodec.RegisterAlias("rig.get_frequency", "FldigiService.RigGetFreq")
+	xmlrpcCodec.RegisterAlias("rig.set_frequency", "FldigiService.RigSetFreq")
+	xmlrpcCodec.RegisterAlias("rig.get_mode", "FldigiService.RigGetMode")
 
 	return r
 }

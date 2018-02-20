@@ -18,33 +18,32 @@ import (
 const CMD_REGEXP  =  "^(?P<cmd>[a-zA-Z]{2})(?P<param>.*);"
 const (
 	FN_RSP = iota
-	FN_GET
-	FN_SET
+	FN_REQ
 )
 
 var cmdParser = regexp.MustCompile(CMD_REGEXP)
 
-var rspMap = map[string][]catFunc{
-	"AC": {ACRsp}, // ANTENNA TUNER CONTROL
-	"AG": {AGRsp}, // AUDIO GAIN
-	"AI": {AIRsp}, // AUTO INFORMATION
-	"IF": {IFRsp}, // INFORMATION
-	"FA": {FARsp}, // VFOA
-	"FB": {FBRsp}, // VFOB
-	"FT": {FTRsp}, // SET TX VFO
-	"KS": {KSRsp}, // KEY SPEED
-	"MD": {MDRsp}, // MODE
-	"NB": {NBRsp}, // NOISE BLANKER STATUS
-	"NL": {NLRsp}, // NOISE BLANKER LEVEL
-	"PA": {PARsp}, // PREAMP
-	"PC": {PCRsp}, // Power
-	"PS": {PSRsp}, // Power switch
-	"RA": {RARsp}, // RX Attenuator
-	"RG": {RGRsp}, // RF Gain
-	"RM": {RMRsp}, // Meter
-	"RL": {RLRsp}, // Noise Reduction
-	"SM": {SMRsp}, // SMeter
-	"VX": {VXRsp}, // VOX
+var funcMap = map[string]catFunc{
+	"AC": AC, // ANTENNA TUNER CONTROL
+	"AG": AG, // AUDIO GAIN
+	"AI": AI,    // AUTO INFORMATION
+	"IF": IF, // INFORMATION
+	"FA": FA, // VFOA
+	"FB": FB, // VFOB
+	"FT": FT, // SET TX VFO
+	"KS": KS, // KEY SPEED
+	"MD": MD, // MODE
+	"NB": NB, // NOISE BLANKER STATUS
+	"NL": NL, // NOISE BLANKER LEVEL
+	"PA": PA, // PREAMP
+	"PC": PC, // Power
+	"PS": PS, // Power switch
+	"RA": RA, // RX Attenuator
+	"RG": RG, // RF Gain
+	"RM": RM, // Meter
+	"RL": RL, // Noise Reduction
+	"SM": SM, // SMeter
+	"VX": VX, // VOX
 
 }
 
@@ -54,7 +53,7 @@ type ft991a struct {
 
 }
 
-type catFunc func(param string) (*rigs.RigCommand, error)
+type catFunc func(param string, dir int) (*rigs.RigCommand, error)
 
 
 func parse(r  string, param string ) (map[string]string, error) {
@@ -153,8 +152,17 @@ func singleValRsp(re string, param string, key string, trim string) (*rigs.RigCo
 	}, nil
 
 }
-
 func switchValRsp(re string, param string, key string) (*rigs.RigCommand, error) {
+	op := rigs.RIG_RSP
+	return switchVal(re, param, key, op)
+}
+
+func switchValSet(re string, param string, key string) (*rigs.RigCommand, error) {
+	op := rigs.RIG_SET
+	return switchVal(re, param, key, op)
+}
+
+func switchVal(re string, param string, key string, op string) (*rigs.RigCommand, error) {
 
 	m, err := parse(re, param)
 	if err != nil {
@@ -171,48 +179,77 @@ func switchValRsp(re string, param string, key string) (*rigs.RigCommand, error)
 	cmdParams[key] = getSwitch(v)
 
 	return &rigs.RigCommand{
-		Id: rigs.RIG_RSP,
+		Id: op,
 		Params: cmdParams ,
 	}, nil
 }
 
-func ACRsp(param string) (*rigs.RigCommand, error) {
+func AC(param string, dir int) (*rigs.RigCommand, error) {
 	// Valid values for response is 0 or 1 (2 is to start tuning)
 	const RE="^00(?P<P1>0|1)"
-
+	if dir == rigs.CAT_DIR_DOWN {
+		return nil, fmt.Errorf("Not Implemented")
+	}
 	return switchValRsp(RE, param, rigs.PRM_TUNER)
 
 }
 
-func AGRsp(param string) (*rigs.RigCommand, error) {
+func AG(param string, dir int) (*rigs.RigCommand, error) {
 	// Valid values are 0 to 255
 	const RE="^0(?P<P1>[01][0-9][0-9]|2[0-4][0-9]|25[0-5])"
-
+	if dir == rigs.CAT_DIR_DOWN {
+		return nil, fmt.Errorf("Not Implemented")
+	}
 	return singleValRsp(RE, param, rigs.PRM_AUDIOG, "0")
 }
 
-func AIRsp(param string) (*rigs.RigCommand, error) {
+func AI(param string, dir int) (*rigs.RigCommand, error) {
 	const RE="^(?P<P1>0|1)"
 
-	return switchValRsp(RE, param, rigs.PRM_AUTOINFO)
+	// rsp
+	if dir == rigs.CAT_DIR_UP {
+		return switchValRsp(RE, param, rigs.PRM_AUTOINFO)
+
+	}
+
+	cmdParams := make(map[string]string)
+
+	// get
+	if param == "" {
+		cmdParams[rigs.PRM_AUTOINFO] = ""
+		return &rigs.RigCommand{
+			Id: rigs.RIG_GET,
+			Params : cmdParams,
+		}, nil
+	}
+
+	// set
+	return switchValSet(RE, param, rigs.PRM_AUTOINFO)
+
 }
 
-func FARsp(param string) (*rigs.RigCommand, error) {
+func FA(param string, dir int) (*rigs.RigCommand, error) {
 	const RE="^(?P<P1>[0-9]{9})"
-
+	if dir == rigs.CAT_DIR_DOWN {
+		return nil, fmt.Errorf("Not Implemented")
+	}
 	return singleValRsp(RE, param, rigs.PRM_VFOA, "0")
 }
 
-func FBRsp(param string) (*rigs.RigCommand, error) {
+func FB(param string, dir int) (*rigs.RigCommand, error) {
 	const RE="^(?P<P1>[0-9]{9})"
-
+	if dir == rigs.CAT_DIR_DOWN {
+		return nil, fmt.Errorf("Not Implemented")
+	}
 	return singleValRsp(RE, param, rigs.PRM_VFOB, "0")
 }
 
-func FTRsp(param string) (*rigs.RigCommand, error) {
+func FT(param string, dir int) (*rigs.RigCommand, error) {
 	const RE = "^(?P<P1>0|1)"
-
-	var cmdParams map[string]string
+	if dir == rigs.CAT_DIR_DOWN {
+		return nil, fmt.Errorf("Not Implemented")
+	}
+	cmdParams := make(map[string]string)
 
 	m, err := parse(RE, param)
 	if err != nil {
@@ -237,13 +274,16 @@ func FTRsp(param string) (*rigs.RigCommand, error) {
 }
 
 
-func IFRsp(param string) (*rigs.RigCommand, error) {
+func IF(param string, dir int) (*rigs.RigCommand, error) {
 	const RE="(?P<P1>[0-9]{3})(?P<P2>[0-9]{9})"+
 		"(?P<P3>[+|-][0-9]{4})(?P<P4>[0-9a-eA-E]{1})"+
 		"(?P<P5>[0-9]{1})(?P<P6>[0-9]{1})"+
 		"(?P<P7>[0-9]{1})(?P<P8>[0-9]{1})"+
 		"(?P<P9>[0-9]{2})(?P<P10>[0-9]{1})"
 
+	if dir == rigs.CAT_DIR_DOWN {
+		return nil, fmt.Errorf("Not Implemented")
+	}
 	m, err := parse(RE, param)
 	if err != nil {
 		return nil, err
@@ -265,15 +305,19 @@ func IFRsp(param string) (*rigs.RigCommand, error) {
 	}, nil
 }
 
-func KSRsp(param string) (*rigs.RigCommand, error) {
+func KS(param string, dir int) (*rigs.RigCommand, error) {
 	const RE="^(?P<P1>[0-9]{3})"
-
+	if dir == rigs.CAT_DIR_DOWN {
+		return nil, fmt.Errorf("Not Implemented")
+	}
 	return singleValRsp(RE, param, rigs.PRM_KEYSPEED, "0")
 }
 
-func MDRsp(param string) (*rigs.RigCommand, error) {
+func MD(param string, dir int) (*rigs.RigCommand, error) {
 	const RE="^(?P<P1>0)(?P<P2>[0-9a-eA-E]{1})"
-
+	if dir == rigs.CAT_DIR_DOWN {
+		return nil, fmt.Errorf("Not Implemented")
+	}
 	m, err := parse(RE, param)
 	if err != nil {
 		return nil, err
@@ -292,63 +336,79 @@ func MDRsp(param string) (*rigs.RigCommand, error) {
 }
 
 //NOISE BLANKER LEVEL
-func NLRsp(param string) (*rigs.RigCommand, error) {
+func NL(param string, dir int) (*rigs.RigCommand, error) {
 	// Valid values are 0 to 10
 	const RE="^00(?P<P1>0[0-9]|10)"
-
+	if dir == rigs.CAT_DIR_DOWN {
+		return nil, fmt.Errorf("Not Implemented")
+	}
 	return singleValRsp(RE, param, rigs.PRM_NBLEVEL, "0")
 }
 
 
 //NOISE BLANKER STATUS
-func NBRsp(param string) (*rigs.RigCommand, error) {
+func NB(param string, dir int) (*rigs.RigCommand, error) {
 	const RE="^0(?P<P1>0|1)"
-
+	if dir == rigs.CAT_DIR_DOWN {
+		return nil, fmt.Errorf("Not Implemented")
+	}
 	return switchValRsp(RE, param, rigs.PRM_NBSTATUS)
 }
 
 //PREAMP
-func PARsp(param string) (*rigs.RigCommand, error) {
+func PA(param string, dir int) (*rigs.RigCommand, error) {
 	const RE="^0(?P<P1>[0-2])"
-
+	if dir == rigs.CAT_DIR_DOWN {
+		return nil, fmt.Errorf("Not Implemented")
+	}
 	return singleValRsp(RE, param, rigs.PRM_PREAMP, "")
 }
 
 // TX POWER
-func PCRsp(param string) (*rigs.RigCommand, error) {
+func PC(param string, dir int) (*rigs.RigCommand, error) {
 	// Valid values are 5 to 100
 	const RE="^(?P<P1>00[5-9]|0[1-9][0-9]|100)"
-
+	if dir == rigs.CAT_DIR_DOWN {
+		return nil, fmt.Errorf("Not Implemented")
+	}
 	return singleValRsp(RE, param, rigs.PRM_POWER, "0")
 }
 
 // POWER SWITCH
-func PSRsp(param string) (*rigs.RigCommand, error) {
+func PS(param string, dir int) (*rigs.RigCommand, error) {
 	const RE="^(?P<P1>0|1)"
-
+	if dir == rigs.CAT_DIR_DOWN {
+		return nil, fmt.Errorf("Not Implemented")
+	}
 	return switchValRsp(RE, param, rigs.PRM_PWRSWITCH)
 }
 
 // RF ATTENUATOR
-func RARsp(param string) (*rigs.RigCommand, error) {
+func RA(param string, dir int) (*rigs.RigCommand, error) {
 	const RE="^0(?P<P1>0|1)"
-
+	if dir == rigs.CAT_DIR_DOWN {
+		return nil, fmt.Errorf("Not Implemented")
+	}
 	return switchValRsp(RE, param, rigs.PRM_ATT)
 }
 
 // RF GAIN
-func RGRsp(param string) (*rigs.RigCommand, error) {
+func RG(param string, dir int) (*rigs.RigCommand, error) {
 	// Valid values are 0 to 255
 	const RE="^0(?P<P1>[01][0-9][0-9]|2[0-4][0-9]|25[0-5])"
-
+	if dir == rigs.CAT_DIR_DOWN {
+		return nil, fmt.Errorf("Not Implemented")
+	}
 	return singleValRsp(RE, param, rigs.PRM_RFGAIN, "0")
 }
 
 // READ METERS
-func RMRsp(param string) (*rigs.RigCommand, error) {
+func RM(param string, dir int) (*rigs.RigCommand, error) {
 	const RE="^(?P<P1>[0-9]{1})(?P<P2>.*)"
 	const RE2="^(?P<P1>[0-9]{3})"
-
+	if dir == rigs.CAT_DIR_DOWN {
+		return nil, fmt.Errorf("Not Implemented")
+	}
 	m, err := parse(RE, param)
 	if err != nil {
 		return nil, err
@@ -376,24 +436,30 @@ func RMRsp(param string) (*rigs.RigCommand, error) {
 }
 
 // NOISE REDUCTION LEVEL
-func RLRsp(param string) (*rigs.RigCommand, error) {
+func RL(param string, dir int) (*rigs.RigCommand, error) {
 	// Valid values are 0 to 15
 	const RE="^0(?P<P1>0[0-9]|1[0-5])"
-
+	if dir == rigs.CAT_DIR_DOWN {
+		return nil, fmt.Errorf("Not Implemented")
+	}
 	return singleValRsp(RE, param, rigs.PRM_NRLVEL, "0")
 }
 
 //SMETER
-func SMRsp(param string) (*rigs.RigCommand, error) {
+func SM(param string, dir int) (*rigs.RigCommand, error) {
 	const RE="^(?P<P1>[0-9]{4})"
-
+	if dir == rigs.CAT_DIR_DOWN {
+		return nil, fmt.Errorf("Not Implemented")
+	}
 	return singleValRsp(RE, param, rigs.PRM_SMETER, "0")
 }
 
 //VOX
-func VXRsp(param string) (*rigs.RigCommand, error) {
+func VX(param string, dir int) (*rigs.RigCommand, error) {
 	const RE="^(?P<P1>0|1)"
-
+	if dir == rigs.CAT_DIR_DOWN {
+		return nil, fmt.Errorf("Not Implemented")
+	}
 	return switchValRsp(RE, param, rigs.PRM_VOX)
 
 }
@@ -405,23 +471,25 @@ func (r *ft991a) Open()  error {
 
 // Converts a CAT response/autoinfo into a RIG command
 
-func  (r *ft991a) OnCatUpStream(command string) (*rigs.RigCommand, error) {
+func  (r *ft991a) OnCat(command string, direction int) (*rigs.RigCommand, error) {
 
 	re  := cmdParser.FindStringSubmatch(command)
-	log.Printf("%d", len(re))
 
 	if len(re) < 2 {
 		return nil, fmt.Errorf("Not a valid command")
 	}
 	cmdId := re[1]
+	log.Printf("[DEBUG] FT991A: Command %s, Direction %d", cmdId, direction)
 
-	if funcs, ok := rspMap[cmdId]; ok {
-		if  funcs[FN_RSP] != nil {
-			return funcs[FN_RSP](re[2])
-		}
+	if funcs, ok := funcMap[cmdId]; ok {
+		return funcs(re[2], direction)
 	}
 
 	return nil, fmt.Errorf("Not a known command")
+}
+
+func  (r *ft991a) OnRig(command *rigs.RigCommand, direction int) (string, error) {
+	return "", fmt.Errorf("Not Implemented")
 }
 
 func New() rigs.Rig {

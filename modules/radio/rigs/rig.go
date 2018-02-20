@@ -3,7 +3,9 @@ package rigs
 
 type Rig interface {
 	Open() error
-	OnCatUpStream(cmd string) (*RigCommand, error)
+	OnCat(cmd string, dir int) (*RigCommand, error)
+	OnRig(cmd *RigCommand, dir int) (string, error)
+
 }
 
 type RigCommand struct {

@@ -45,6 +45,18 @@ func setRts(fd uintptr,b  bool) error {
 	return ioctl(fd, syscall.TIOCMSET, uintptr(unsafe.Pointer(&state)))
 }
 
+func setDTR(fd uintptr,b  bool) error {
+	state := syscall.TIOCM_DTR
+	if err := ioctl(fd, syscall.TIOCMGET, uintptr(unsafe.Pointer(&state))); err != nil {
+		return err
+	}
+	if b {
+		state |= syscall.TIOCM_DTR
+	} else {
+		state &^= syscall.TIOCM_DTR
+	}
+	return ioctl(fd, syscall.TIOCMSET, uintptr(unsafe.Pointer(&state)))
+}
 
 func openInternal(options SerialConfig) (io.ReadWriteCloser, error) {
 
@@ -118,7 +130,7 @@ func openInternal(options SerialConfig) (io.ReadWriteCloser, error) {
 		return nil, nonblockErr
 	}
 
-	//setRts(fd, true)
+	setDTR(fd, false)
 
 	Tcflush(fd, syscall.TCIFLUSH)
 
